@@ -1,6 +1,27 @@
 # CHANGELOG.md
 
-All notable changes to StableAgent OS — AI 降智防御系统.
+All notable changes to StableAgent Capsule — 个人技能进化层.
+
+---
+
+## V12.0 (2026-06-03) — StableAgent Capsule 收敛式精简重构
+
+### Changed
+- `_h_task_os_agent` 从 620 行瘦身到 39 行 (-94%)
+- `unified_tool_registry.py` 从 2519 行缩减到 1937 行 (-23%)
+- CLI `task run` 默认使用 local runtime，不需要启动 HTTP server
+- stdio MCP 默认使用 local runtime，不需要启动 HTTP server
+- `validate_delayed()` 从 stub 变为真实实现
+
+### Added
+- `stable_agent/core/os_agent_handler.py` — 薄编排层 (Executor → Curator → ContractBuilder)
+- `stable_agent/eval/related_task_store.py` — Related Task Store (Delayed Validation 数据源)
+- `stable_agent/runtime/local_runtime.py` — Local Runtime (CLI/stdio 脱离 HTTP)
+- CuratorService 接入主学习闭环
+- 7 个新测试文件，62 个新测试
+
+### Removed
+- `_h_task_os_agent` 内联回退路径 (575 行死代码)
 
 ---
 

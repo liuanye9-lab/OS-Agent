@@ -216,12 +216,20 @@ class TestEventSyncHealth:
     """V9.0: 事件同步健康检查字段。"""
 
     def test_sync_health_fields_in_tool_result(self):
-        """验证 _h_task_os_agent 返回的 data 包含同步健康字段。"""
-        # 结构检查（不启动服务器）
-        from stable_agent.gateway.unified_tool_registry import UnifiedToolRegistry
+        """验证 os_agent 返回的 data 包含同步健康字段。"""
+        # V12.0: 检查 ContractBuilder 和 OSAgentHandler 而非 _h_task_os_agent 内联代码
+        from stable_agent.core.contracts import ContractBuilder
+        from stable_agent.core.models import ToolRunResult
         import inspect
 
-        source = inspect.getsource(UnifiedToolRegistry._h_task_os_agent)
+        # ContractBuilder.to_dict 必须输出这些字段
+        source = inspect.getsource(ContractBuilder.to_dict)
         assert "emitted_event_count" in source
         assert "event_sync_ok" in source
         assert "sync_errors" in source
+
+        # ToolRunResult 必须有这些字段
+        result_fields = {f.name for f in ToolRunResult.__dataclass_fields__.values()}
+        assert "emitted_event_count" in result_fields
+        assert "event_sync_ok" in result_fields
+        assert "sync_errors" in result_fields

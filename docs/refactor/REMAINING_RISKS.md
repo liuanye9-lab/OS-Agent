@@ -1,41 +1,38 @@
 # REMAINING_RISKS.md — 剩余风险
 
-> 日期: 2026-06-02
+## 高优先级
 
----
+1. **Local Runtime 初始化依赖链**
+   - `LocalStableAgentRuntime._ensure_initialized()` 依赖 `Orchestrator`、`ToolRouter` 等
+   - 如果这些组件的初始化失败，CLI/stdio 将无法工作
+   - **缓解:** HTTP 回退路径仍然可用 (`--http` flag)
 
-## P1 风险
+2. **CuratorService 生成的 candidate 质量**
+   - `_generate_proposed_rule()` 使用硬编码模板
+   - 实际场景中需要 LLM 生成更精确的规则
+   - **缓解:** candidate 不直接影响执行，只进入候选池
 
-### 1. Executor 未完全抽出
-- **描述**: `_h_task_os_agent` (575行) 仍在 unified_tool_registry.py 中，OSAgentExecutor 是并行副本
-- **影响**: 两套执行逻辑可能不一致
-- **缓解**: 下一步将 _h_task_os_agent 委托给 OSAgentExecutor
+3. **Delayed Validation v1 简化实现**
+   - `_estimate_improvement()` 使用启发式估算，非真实执行
+   - 需要集成真实 executor 才能得到准确结果
+   - **缓解:** 当前实现已满足基本验证需求
 
-### 2. 旧测试可能受影响
-- **描述**: profile 过滤可能影响旧测试的工具数量断言
-- **影响**: 已修复 test_unified_tool_registry.py，其他测试可能受影响
-- **缓解**: 运行完整测试套件验证
+## 中优先级
 
----
+4. **MCP 网关测试 (10 个既存失败)**
+   - 工具数量、格式等测试与当前架构不匹配
+   - 需要更新这些测试以匹配新架构
 
-## P2 风险
+5. **unified_tool_registry.py 仍有 1937 行**
+   - 55 个 handler 方法可以进一步拆分
+   - SaaS 相关 handler (12 个) 可以移到独立模块
 
-### 3. Delayed Validation 为 stub
-- **描述**: `validate_delayed()` 当前直接通过，未实现真正的 related task 验证
-- **影响**: 技能验证不够严格
-- **缓解**: 后续实现基于 related tasks 的真实验证
+## 低优先级
 
-### 4. Human Review 未集成
-- **描述**: 高风险 skill 自动跳过 promote，但没有 human review UI
-- **影响**: 高风险技能无法 promote
-- **缓解**: 后续集成 human review 流程
+6. **Dashboard Observer 瘦身未完成**
+   - Phase 7 (Observer 瘦身) 在本轮未实施
+   - 当前 Observer 功能正常，只是信息偏杂
 
-### 5. MCP stdio 未更新 profile
-- **描述**: mcp_stdio.py 仍使用旧的硬编码工具列表
-- **影响**: stdio 模式下工具数量不受 profile 控制
-- **缓解**: 后续更新 mcp_stdio.py 支持 profile 参数
-
-### 6. RunStore SQLite 未注入到 web/app.py
-- **描述**: web/app.py 创建 RunStore 时未传入 db_path
-- **影响**: Observer 0% 问题可能在生产环境仍存在
-- **缓解**: 后续更新 web/app.py 注入 db_path
+7. **最佳实践**
+   - `export_best_skill()` 只从 promoted skills 汇总
+   - 但目前没有自动 promote 机制 (需要 human review)

@@ -69,6 +69,29 @@ def _http_post(url: str, body: dict, timeout: float = 30.0) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _call_local_runtime(task_input: str, open_dashboard: bool = True) -> dict:
+    """通过 local runtime 调用 stableagent.task.os_agent。"""
+    from stable_agent.runtime.local_runtime import LocalStableAgentRuntime
+
+    runtime = LocalStableAgentRuntime()
+    raw = runtime.call_tool("stableagent.task.os_agent", {
+        "task_input": task_input,
+        "open_dashboard": open_dashboard,
+    })
+
+    sc = raw.get("structuredContent", {})
+    return {
+        "ok": sc.get("ok", not raw.get("isError", False)),
+        "run_id": sc.get("run_id", ""),
+        "dashboard_url": sc.get("dashboard_url", ""),
+        "observer_url": sc.get("observer_url", ""),
+        "missing_required_events": sc.get("missing_required_events", []),
+        "understanding_trace": sc.get("understanding_trace"),
+        "token_report": sc.get("token_report"),
+        "error": sc.get("error"),
+    }
+
+
 def _output(data: dict, args: argparse.Namespace) -> None:
     """Output JSON or human-readable summary."""
     if getattr(args, "json", False):
@@ -181,12 +204,28 @@ def cmd_mcp_config(args: argparse.Namespace) -> None:
 def cmd_task_run(args: argparse.Namespace) -> None:
     """执行 StableAgent 任务 (CLI Mode)。
 
-    优先调用本地 HTTP MCP，如果 server 不可达则返回明确错误。
+    V12.0: 默认使用 local runtime，不需要启动 HTTP server。
+    如果指定 --http，则走 HTTP MCP。
     """
     task_input: str = args.task_input
     open_dashboard: bool = args.open_dashboard
     use_json: bool = args.json
+    use_http: bool = getattr(args, "http", False)
     base = _base_url(args)
+
+    # V12.0: 默认使用 local runtime
+    if not use_http:
+        try:
+            result = _call_local_runtime(task_input, open_dashboard)
+            _output(result, args)
+            if not result.get("ok", False):
+                sys.exit(1)
+            return
+        except Exception as local_exc:
+            if not use_json:
+                print(f"Local runtime 失败 ({local_exc})，尝试 HTTP 回退...")
+
+    # HTTP 回退路径
     mcp_url = f"{base}/mcp/"
 
     rpc_body = {
@@ -692,6 +731,7 @@ def main() -> None:
     run_p = task_sub.add_parser("run", help="执行 StableAgent 任务")
     run_p.add_argument("--task-input", "-t", required=True, help="任务内容")
     run_p.add_argument("--open-dashboard", action="store_true", default=False, help="完成后打开 Dashboard")
+    run_p.add_argument("--http", action="store_true", default=False, help="使用 HTTP MCP 模式 (需要先启动 server)")
     _add_server_flags(run_p)
     _add_json_flag(run_p)
     run_p.set_defaults(func=cmd_task_run)

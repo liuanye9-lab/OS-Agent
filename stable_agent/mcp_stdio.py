@@ -181,7 +181,8 @@ def _handle_tools_list(req_id: Any) -> dict[str, Any]:
 def _handle_tools_call(req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     """处理 tools/call 方法。
 
-    通过 HTTP MCP 调用实际工具（需要 server 运行）。
+    V12.0: 优先使用 local runtime，不需要 HTTP server。
+    如果 --http 模式，回退到 HTTP MCP。
     """
     tool_name: str = params.get("name", "")
     arguments: dict[str, Any] = params.get("arguments", {})
@@ -195,7 +196,15 @@ def _handle_tools_call(req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     if tool_name not in tool_names:
         return _make_error(req_id, -32602, f"未知工具：{tool_name}")
 
-    # 通过 HTTP MCP 调用实际工具
+    # V12.0: 默认使用 local runtime (不需要启动 HTTP server)
+    if not _use_http_mode():
+        try:
+            result = _call_via_local_runtime(tool_name, arguments)
+            return _make_response(req_id, result)
+        except Exception as exc:
+            logger.warning("Local runtime failed, trying HTTP fallback: %s", exc)
+
+    # HTTP 回退路径
     try:
         import urllib.request
 
@@ -220,7 +229,6 @@ def _handle_tools_call(req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
         with urllib.request.urlopen(req, timeout=60.0) as resp:
             result = json.loads(resp.read().decode("utf-8"))
 
-        # 返回 MCP 格式的响应
         if "error" in result:
             return _make_response(req_id, {
                 "content": [{"type": "text", "text": f"JSON-RPC 错误: {result['error'].get('message', '未知错误')}"}],
@@ -241,11 +249,33 @@ def _handle_tools_call(req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
             "structuredContent": {
                 "ok": False,
                 "run_id": "",
-                "error": f"StableAgent server 未启动或请求失败: {exc}",
-                "suggestion": "请先运行: PYTHONPATH=. .venv/bin/python -m stable_agent.cli serve",
+                "error": f"工具调用失败: {exc}",
+                "suggestion": "Local runtime 初始化失败，请检查 PYTHONPATH 和依赖",
             },
             "isError": True,
         })
+
+
+def _use_http_mode() -> bool:
+    """判断是否使用 HTTP 模式。"""
+    import os
+    return os.environ.get("STABLE_AGENT_USE_HTTP", "").lower() in ("1", "true", "yes")
+
+
+def _call_via_local_runtime(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """通过 local runtime 调用工具。"""
+    from stable_agent.runtime.local_runtime import LocalStableAgentRuntime
+
+    # 使用模块级单例
+    global _local_runtime
+    if '_local_runtime' not in globals() or _local_runtime is None:
+        _local_runtime = LocalStableAgentRuntime()
+
+    return _local_runtime.call_tool(tool_name, arguments)
+
+
+# 模块级 local runtime 单例
+_local_runtime = None
 
 
 def _get_tools_for_profile() -> list[dict[str, Any]]:

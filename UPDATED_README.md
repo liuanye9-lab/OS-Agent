@@ -1,128 +1,139 @@
-# StableAgent OS — AI 降智防御系统
+<p align="center">
+  <img src="https://img.shields.io/badge/StableAgent-Capsule-111827?style=for-the-badge" alt="StableAgent Capsule">
+  <img src="https://img.shields.io/badge/MCP-10_tools_(minimal)-7c3aed?style=for-the-badge" alt="MCP Tools">
+  <img src="https://img.shields.io/badge/Skill_Curation-Layer-22c55e?style=for-the-badge" alt="Skill Curation">
+  <img src="https://img.shields.io/badge/CLI--First-Ready-0ea5e9?style=for-the-badge" alt="CLI-First">
+  <img src="https://img.shields.io/badge/Delayed_Validation-v1-f59e0b?style=for-the-badge" alt="Delayed Validation">
+</p>
 
-> **真正的闭环自我优化 + 解释型可视化面板**
+<h1 align="center">StableAgent Capsule</h1>
 
-防止 AI Agent 在执行任务过程中"降智"（遗忘关键约束、跑偏方向、产生幻觉），并通过**真实闭环**让系统越用越好。
+<p align="center">
+  <strong>A lightweight CLI/MCP skill curation layer for self-evolving coding agents.</strong><br />
+  <sub>减少 AI Coding Agent 的跑偏、失忆、重复犯错和上下文压缩降智</sub>
+</p>
 
 ---
 
-## 闭环架构
+## 一句话定位
+
+**StableAgent Capsule 是一个通过 CLI/MCP 接入 Claude Code、Codex、Cursor 的个人技能进化层。**
+
+它不是另一个 Agent，不堆 55 个工具。它是一层可观察、可验证、可回滚、可迁移的 **Skill Curation Layer**。
+
+| 概念 | 说明 |
+|---|---|
+| Executor | 只负责执行任务 |
+| Curator | 只负责整理技能 |
+| SkillRepo | 外部技能库，不是记忆垃圾桶 |
+| ValidationGate | candidate 必须经过验证 |
+| Delayed Validation | 用后续相关任务验证改进效果 |
+| best_skill.md | 只来自 promoted skills 汇总导出 |
+
+## 架构概览
 
 ```
-用户 / Claude Code / Codex / Cursor
-    ↓
-MCP tools/call → stableagent.task.os_agent
-    ↓
-RunLifecycle (22 阶段，统一状态源)
-    ↓
-TemporalMemoryRouter (按时间戳召回记忆)
-    ↓
-ContextCompressionGuard (保护核心目标不被压缩)
-    ↓
-Workflow / Orchestrator (17 步执行流程)
-    ↓
-DecisionTraceBuilder (生成可解释决策轨迹)
-    ↓
-Dashboard Observer (实时可视化：像素人 + 状态卡片 + 时间线)
-    ↓
-Eval → FailureAttribution → RegressionCase
-    ↓
-MemoryCandidate | SkillPatchCandidate → ValidationGate
-    ↓
-HumanReviewQueue → best_skill.md (版本化导出)
+CLI / stdio MCP / HTTP MCP
+        ↓
+  OSAgentHandler (薄编排层)
+        ↓
+  OSAgentExecutor.run() → RunTrace
+        ↓
+  CuratorService.analyze_trace()
+        ↓
+  CuratorService.propose_candidates()
+        ↓
+  ValidationGate.validate_schema()
+        ↓
+  SkillRepository.create_candidate()
+        ↓
+  DelayedValidation → validated / promoted
 ```
 
 ## 快速开始
 
-```bash
-# 一键部署
-bash scripts/deploy_local.sh
-
-# 访问
-#   Dashboard: http://127.0.0.1:8000
-#   MCP:       http://127.0.0.1:8000/mcp
-#   API Docs:  http://127.0.0.1:8000/docs
-```
-
-## 测试
+### CLI Mode (推荐，不需要启动 server)
 
 ```bash
-# 全量测试 (1083 passed)
-pytest -q --ignore=tests/test_mcp_gateway.py
-
-# 冒烟测试
-bash scripts/smoke_test.sh
-
-# 集成测试
-bash scripts/integration_test.sh
-
-# 闭环结构检查
-python tools/check_closed_loop.py
+PYTHONPATH=. .venv/bin/python -m stable_agent.cli task run \
+  --task-input "重构登录模块" \
+  --json
 ```
 
-## MCP 集成
-
-在 Claude Code / Cursor / Codex 的 MCP 配置中添加：
+### stdio MCP Mode (Claude Code 集成)
 
 ```json
 {
   "mcpServers": {
-    "stableagent": {
-      "url": "http://127.0.0.1:8000/mcp"
+    "stableagent-stdio": {
+      "type": "stdio",
+      "command": "/path/to/.venv/bin/python",
+      "args": ["-m", "stable_agent.mcp_stdio", "--profile", "minimal"],
+      "env": {
+        "PYTHONPATH": "/path/to/OS-Agent"
+      }
     }
   }
 }
 ```
 
-## 核心特性
+### HTTP MCP Mode (可选)
 
-| 特性 | 状态 |
-|------|------|
-| 22 阶段 RunLifecycle 统一状态源 | ✅ |
-| 时间感知记忆路由（防遗忘） | ✅ |
-| 上下文压缩保护（防降智） | ✅ |
-| 真实自我优化闭环（Eval→Regression→Validation→HumanReview→Export） | ✅ |
-| 可解释决策轨迹（不含 chain_of_thought） | ✅ |
-| Canvas 像素人 17 场景 Dashboard | ✅ |
-| best_skill.md 版本化 + Human Review 守卫 | ✅ |
-| MCP V5 Gateway + 40+ 事件→阶段映射 | ✅ |
+```bash
+# 启动 server
+PYTHONPATH=. .venv/bin/python -m stable_agent.cli serve
 
-## 版本
+# Claude Code 配置
+{
+  "mcpServers": {
+    "stableagent-http": {
+      "type": "http",
+      "url": "http://127.0.0.1:8000/mcp/"
+    }
+  }
+}
+```
 
-- **V8.1**: Phase 1-9 闭环硬化，Canvas 像素人，_generate_skill_patches 真实验证
-- **V7.1**: Human Review API + 飞书通知 + best_skill 版本化
-- **V7.0**: 物理清理 (progress_model.py, gateway/run_lifecycle.py)
-- **V6.3**: HumanReviewQueue, best_skill 自动导出, RAG STUB→真实
-- **V6.2**: Dashboard 收敛, V3/V4 MCP 删除, LLM 验证
-- **V6.1**: TemporalMemoryBridge, ContextCompressionGuard, RegressionValidationRunner
+## Tool Profiles
 
-## 文档
+| Profile | 工具数 | 说明 |
+|---|---|---|
+| minimal | 10 | 核心闭环 (默认) |
+| default | 20 | 核心 + eval/skill 调试 |
+| full | 55 | 所有旧工具 (兼容) |
 
-| 文档 | 说明 |
-|------|------|
-| [CLOSED_LOOP_AUDIT.md](CLOSED_LOOP_AUDIT.md) | 闭环审计 |
-| [RUN_LIFECYCLE_SPEC.md](RUN_LIFECYCLE_SPEC.md) | RunLifecycle 规范 |
-| [TEMPORAL_MEMORY_SPEC.md](TEMPORAL_MEMORY_SPEC.md) | 时间记忆规范 |
-| [CONTEXT_COMPRESSION_GUARD_SPEC.md](CONTEXT_COMPRESSION_GUARD_SPEC.md) | 压缩保护规范 |
-| [SELF_IMPROVEMENT_PROOF_SPEC.md](SELF_IMPROVEMENT_PROOF_SPEC.md) | 自我优化规范 |
-| [DASHBOARD_OBSERVER_SPEC.md](DASHBOARD_OBSERVER_SPEC.md) | Dashboard 规范 |
-| [DEPLOYMENT_AND_TESTING_GUIDE.md](DEPLOYMENT_AND_TESTING_GUIDE.md) | 部署与测试 |
+```bash
+export STABLE_AGENT_TOOL_PROFILE=minimal
+```
 
-## 项目结构
+## Skill 生命周期
 
 ```
-stable_agent/
-  runtime/          RunLifecycle (唯一状态源)
-  memory/           TemporalMemoryRouter + Bridge
-  context/           ContextCompressionGuard
-  self_improvement/  ProofLoop + RegressionValidation + HumanReview
-  observation/       DecisionTraceBuilder + EventStream
-  gateway/           ToolRouter + MCP Gateway
-  orchestrator.py    17步编排器
-web/
-  templates/         Dashboard HTML
-  static/             Avatar Canvas, Observer JS, CSS
-  server.py          FastAPI + WebSocket
-scripts/             部署 + 测试脚本
-tools/               check_closed_loop.py, integration_test.py
+draft → candidate → validated → promoted → deprecated → archived
 ```
+
+- 失败经验只能生成 **candidate**
+- candidate 必须经过 **ValidationGate**
+- **Delayed Validation** 用后续相关任务验证
+- `dry_run_learning=true` 时只允许生成 candidate，不允许 promote
+- `best_skill.md` 只来自 promoted skills 汇总
+
+## 核心组件
+
+| 组件 | 文件 | 职责 |
+|---|---|---|
+| OSAgentHandler | `core/os_agent_handler.py` | 薄编排层 |
+| OSAgentExecutor | `core/executor.py` | 执行任务，生成 RunTrace |
+| CuratorService | `core/curator.py` | 从 trace 提炼 skill 候选 |
+| ValidationGate | `core/validator.py` | Schema + Regression + Delayed 验证 |
+| SkillRepository | `skills/repository.py` | 文件 + SQLite 双层存储 |
+| DelayedValidationGate | `core/delayed_validation.py` | 延迟验证 (related tasks) |
+| LocalRuntime | `runtime/local_runtime.py` | CLI/stdio 本地运行时 |
+
+## 详细文档
+
+- [核心架构](docs/CORE_ARCHITECTURE.md)
+- [MCP 配置](docs/CLAUDE_CODE_MCP_SETUP.md)
+- [SkillOS 集成](docs/SKILLOS_ADAPTATION.md)
+- [CLI 指南](docs/CLI_FIRST_GUIDE.md)
+- [重构报告](docs/refactor/FINAL_PROGRESS_REPORT.md)

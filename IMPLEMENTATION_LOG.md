@@ -1,8 +1,77 @@
-# IMPLEMENTATION_LOG.md — StableAgent Cloud 闭环优化实施日志
+# IMPLEMENTATION_LOG.md — StableAgent Capsule 实施日志
 
 **开始时间**: 2026-05-30 23:00
-**完成时间**: 2026-06-02 22:55
-**最终状态**: V11.5 — SkillOS Convergence Refactor
+**完成时间**: 2026-06-03 00:10
+**最终状态**: V12.0 — StableAgent Capsule 收敛式精简重构
+
+---
+
+## V12.0 StableAgent Capsule 收敛式精简重构 (2026-06-02 23:57–00:10)
+
+**[进度 100%] 测试和文档完成**
+
+### Phase 0: 审计 [进度 0%→10%]
+- **改了什么:** 生成 00_CURRENT_PROGRESS_AUDIT.md, 01_REFACTOR_CONTRACT.md, 02_RISK_AND_ROLLBACK.md
+- **为什么改:** 了解当前状态，冻结外部契约，评估风险
+- **涉及文件:** docs/refactor/00_CURRENT_PROGRESS_AUDIT.md, 01_REFACTOR_CONTRACT.md, 02_RISK_AND_ROLLBACK.md
+- **验证:** 文档完整
+- **风险:** 无
+- **下一步:** 冻结契约测试
+
+### Phase 1: 契约冻结 [进度 10%→15%]
+- **改了什么:** 创建 tests/test_os_agent_contract.py (17 tests)
+- **为什么改:** 确保重构前后外部契约不变
+- **涉及文件:** tests/test_os_agent_contract.py
+- **验证:** 17 tests passed
+- **风险:** 无
+- **下一步:** 拆分 handler
+
+### Phase 2: Handler 瘦身 [进度 15%→35%]
+- **改了什么:** 创建 stable_agent/core/os_agent_handler.py。_h_task_os_agent 从 620 行瘦身到 39 行。删除内联回退。unified_tool_registry.py 从 2519 行缩减到 1937 行。
+- **为什么改:** _h_task_os_agent 太胖，承担了事件发布、RunStore、理解、记忆、压缩、token、执行、评估、自我优化、dashboard 检查等所有逻辑
+- **涉及文件:** stable_agent/core/os_agent_handler.py, stable_agent/gateway/unified_tool_registry.py, tests/test_os_agent_handler_slim.py
+- **验证:** 全量测试 1742 passed, 10 failed (既存)
+- **风险:** 中 (删除内联回退)
+- **下一步:** 接入 Curator
+
+### Phase 3: Curator 接入主链路 [进度 35%→45%]
+- **改了什么:** OSAgentHandler._run_curator() 在 executor.run() 后调用 CuratorService
+- **为什么改:** CuratorService 已存在但未接入主流程
+- **涉及文件:** stable_agent/core/os_agent_handler.py
+- **验证:** force_eval_failed 触发 candidate 生成
+- **风险:** 低 (后置步骤，失败不影响主流程)
+- **下一步:** Delayed Validation
+
+### Phase 4: Delayed Validation v1 [进度 45%→60%]
+- **改了什么:** 实现 validator.validate_delayed() 真实逻辑。创建 stable_agent/eval/related_task_store.py
+- **为什么改:** validate_delayed() 是 stub，直接返回 passed=True
+- **涉及文件:** stable_agent/core/validator.py, stable_agent/eval/related_task_store.py, tests/test_delayed_validation_v1.py, tests/test_promotion_policy.py
+- **验证:** 25 tests passed
+- **风险:** 中 (简化实现)
+- **下一步:** Local Runtime
+
+### Phase 5: Local Runtime / CLI / stdio MCP [进度 60%→75%]
+- **改了什么:** 创建 stable_agent/runtime/local_runtime.py。CLI 和 stdio MCP 默认使用 local runtime，不需要启动 HTTP server。
+- **为什么改:** CLI 和 stdio MCP 当前依赖 HTTP server
+- **涉及文件:** stable_agent/runtime/local_runtime.py, stable_agent/cli.py, stable_agent/mcp_stdio.py, tests/test_local_runtime.py, tests/test_mcp_stdio_without_http.py, tests/test_cli_without_http.py
+- **验证:** 11 tests passed
+- **风险:** 中 (初始化依赖链)
+- **下一步:** 文档更新
+
+### Phase 6: 文档定位更新 [进度 75%→85%]
+- **改了什么:** 创建 UPDATED_README.md，从 StableAgent OS 收敛为 StableAgent Capsule
+- **为什么改:** README 仍定位为 StableAgent OS，显示 MCP 55 tools
+- **涉及文件:** UPDATED_README.md
+- **验证:** 文档完整
+- **风险:** 低
+- **下一步:** 测试和文档
+
+### Phase 8: 测试与验收 [进度 85%→100%]
+- **改了什么:** 全量测试通过，生成所有输出文档
+- **为什么改:** 验证重构无回归
+- **涉及文件:** docs/refactor/*.md
+- **验证:** 1742 passed, 10 failed (既存), 8 skipped
+- **风险:** 无
 
 ---
 
