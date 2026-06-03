@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""StableAgent V11.4 CLI — 胶囊管理 + CLI Mode 命令行工具。
+"""StableAgent Capsule CLI — 胶囊管理 + CLI Mode 命令行工具。
 
 Usage:
     # Capsule 管理
@@ -16,7 +16,7 @@ Usage:
     # MCP 配置
     python -m stable_agent.cli mcp config
 
-    # V11.4: CLI Mode
+    # CLI Mode
     python -m stable_agent.cli serve [--host 127.0.0.1] [--port 8000]
     python -m stable_agent.cli health [--json]
     python -m stable_agent.cli task run -t "任务内容" [--open-dashboard] [--json]
@@ -41,6 +41,36 @@ from pathlib import Path
 # Default server config
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
+
+
+def normalize_h_agent_output(data: dict) -> dict:
+    """Normalize CLI output to h-agent-v1 contract format."""
+    result = {
+        "ok": data.get("ok", False),
+        "run_id": data.get("run_id", ""),
+        "dashboard_url": data.get("dashboard_url", ""),
+        "observer_url": data.get("observer_url", ""),
+        "output_text": data.get("output_text") or data.get("text") or data.get("output") or "",
+        "eval_passed": data.get("eval_passed", False),
+        "eval_score": data.get("eval_score", None),
+        "missing_required_events": data.get("missing_required_events", []),
+        "understanding_trace": data.get("understanding_trace", None),
+        "token_report": data.get("token_report", None),
+        "error": data.get("error", None),
+        "suggestion": data.get("suggestion", None),
+        "contract_version": "h-agent-v1",
+    }
+    # Auto-fill error if failed but no error message
+    if not result["ok"] and not result["error"]:
+        result["error"] = "工具调用失败，原因未知"
+    # Auto-fill output_text if success but empty
+    if result["ok"] and not result["output_text"]:
+        result["output_text"] = "任务执行完成"
+    # Preserve extra fields for backward compatibility
+    for key in data:
+        if key not in result:
+            result[key] = data[key]
+    return result
 
 
 def _base_url(args: argparse.Namespace) -> str:
@@ -93,9 +123,13 @@ def _call_local_runtime(task_input: str, open_dashboard: bool = True) -> dict:
 
 
 def _output(data: dict, args: argparse.Namespace) -> None:
-    """Output JSON or human-readable summary."""
+    """Output JSON or human-readable summary.
+
+    When --json flag is used, output is normalized to h-agent-v1 contract.
+    """
     if getattr(args, "json", False):
-        print(json.dumps(data, ensure_ascii=False))
+        normalized = normalize_h_agent_output(data)
+        print(json.dumps(normalized, ensure_ascii=False))
     else:
         _print_summary(data)
 
@@ -197,7 +231,7 @@ def cmd_mcp_config(args: argparse.Namespace) -> None:
 
 
 # ===================================================================
-# V11.4: CLI Mode Commands
+# CLI Mode Commands
 # ===================================================================
 
 
@@ -257,7 +291,7 @@ def cmd_task_run(args: argparse.Namespace) -> None:
         _output(error_data, args)
         sys.exit(1)
 
-    # V11.4: 检查 JSON-RPC 错误
+    # 检查 JSON-RPC 错误
     if "error" in result:
         rpc_error = result["error"]
         error_data = {
@@ -279,7 +313,7 @@ def cmd_task_run(args: argparse.Namespace) -> None:
     rpc_result = result.get("result", {})
     sc = rpc_result.get("structuredContent", {})
 
-    # V11.4: 从 structuredContent 提取核心字段，确保都有默认值
+    # 从 structuredContent 提取核心字段，确保都有默认值
     output = {
         "ok": sc.get("ok", not rpc_result.get("isError", False)),
         "run_id": sc.get("run_id", ""),
@@ -289,10 +323,10 @@ def cmd_task_run(args: argparse.Namespace) -> None:
         "understanding_trace": sc.get("understanding_trace"),
         "token_report": sc.get("token_report"),
         "expression_matches": sc.get("expression_matches"),
-        "error": sc.get("error"),  # V11.4: 错误信息
+        "error": sc.get("error"),  # 错误信息
     }
 
-    # V11.4: 确保 ok=false 时必须有 error 字段
+    # 确保 ok=false 时必须有 error 字段
     if not output["ok"] and not output["error"]:
         output["error"] = sc.get("plain_text") or rpc_result.get("plain_text") or "工具调用失败，原因未知"
 
@@ -478,7 +512,7 @@ def cmd_dashboard_open(args: argparse.Namespace) -> None:
 
 
 # ===================================================================
-# V11.5: Doctor + Skill Commands (Phase 6)
+# Doctor + Skill Commands (Phase 6)
 # ===================================================================
 
 
@@ -648,6 +682,138 @@ def cmd_skill_promote(args: argparse.Namespace) -> None:
             sys.exit(1)
 
 
+def cmd_integration_doctor(args: argparse.Namespace) -> None:
+    """Integration environment health check for H.Agent."""
+    import importlib
+    import os
+
+    use_json = getattr(args, "json", False)
+    checks: dict = {}
+    all_ok = True
+
+    # 1. Check Python version >= 3.11
+    py_version = sys.version_info
+    py_ok = py_version >= (3, 11)
+    checks["python_version"] = {
+        "ok": py_ok,
+        "version": f"{py_version.major}.{py_version.minor}.{py_version.micro}",
+        "required": ">=3.11",
+    }
+    if not py_ok:
+        all_ok = False
+
+    # 2. Check requirements.txt packages are importable
+    req_file = Path.cwd() / "requirements.txt"
+    missing_packages: list = []
+    if req_file.exists():
+        req_lines = req_file.read_text().splitlines()
+        for line in req_lines:
+            line = line.strip()
+            if not line or line.startswith("#") or line.startswith("-"):
+                continue
+            # Extract package name (before ==, >=, ~=, etc.)
+            pkg_name = line.split("==")[0].split(">=")[0].split("~=")[0].split("<=")[0].split(">")[0].split("<")[0].strip()
+            # Normalize hyphens to underscores for import
+            import_name = pkg_name.replace("-", "_")
+            try:
+                importlib.import_module(import_name)
+            except ImportError:
+                # Try original name
+                try:
+                    importlib.import_module(pkg_name)
+                except ImportError:
+                    missing_packages.append(pkg_name)
+        checks["requirements"] = {
+            "ok": len(missing_packages) == 0,
+            "missing": missing_packages,
+        }
+        if missing_packages:
+            all_ok = False
+    else:
+        checks["requirements"] = {"ok": False, "error": "requirements.txt not found"}
+        all_ok = False
+
+    # 3. Check stable_agent can be imported
+    try:
+        importlib.import_module("stable_agent")
+        checks["stable_agent_import"] = {"ok": True}
+    except ImportError as exc:
+        checks["stable_agent_import"] = {"ok": False, "error": str(exc)}
+        all_ok = False
+
+    # 4. Check if LocalStableAgentRuntime can be initialized
+    try:
+        from stable_agent.runtime.local_runtime import LocalStableAgentRuntime
+        runtime = LocalStableAgentRuntime()
+        checks["runtime_init"] = {"ok": True}
+    except ImportError as exc:
+        checks["runtime_init"] = {"ok": False, "error": f"Import failed: {exc}"}
+        all_ok = False
+    except Exception as exc:
+        checks["runtime_init"] = {"ok": False, "error": f"Init failed: {exc}"}
+        all_ok = False
+
+    # 5. Check if stableagent.task.os_agent tool exists in tool schemas
+    try:
+        from stable_agent.gateway.mcp_gateway import MCPGateway
+        gateway = MCPGateway()
+        tools = gateway.list_tools() if hasattr(gateway, "list_tools") else []
+        tool_names = [t.get("name", "") if isinstance(t, dict) else getattr(t, "name", "") for t in tools]
+        has_os_agent = "stableagent.task.os_agent" in tool_names
+        checks["os_agent_tool"] = {"ok": has_os_agent, "tool_count": len(tool_names)}
+        if not has_os_agent:
+            all_ok = False
+    except ImportError as exc:
+        checks["os_agent_tool"] = {"ok": False, "error": f"Import failed: {exc}"}
+        all_ok = False
+    except Exception as exc:
+        checks["os_agent_tool"] = {"ok": False, "error": f"Check failed: {exc}"}
+        all_ok = False
+
+    # 6. Run a quick task run --json dry check (verify normalize works)
+    try:
+        from stable_agent.cli import normalize_h_agent_output
+        test_result = normalize_h_agent_output({"ok": True, "run_id": "test_run"})
+        contract_ok = test_result.get("contract_version") == "h-agent-v1"
+        checks["contract_normalize"] = {"ok": contract_ok}
+        if not contract_ok:
+            all_ok = False
+    except Exception as exc:
+        checks["contract_normalize"] = {"ok": False, "error": str(exc)}
+        all_ok = False
+
+    # Summary
+    checks["ok"] = all_ok
+    checks["contract_version"] = "h-agent-v1"
+
+    if use_json:
+        print(json.dumps(checks, ensure_ascii=False, indent=2))
+    else:
+        print("StableAgent Integration Doctor")
+        print("=" * 45)
+        for key, value in checks.items():
+            if isinstance(value, dict):
+                status = "OK" if value.get("ok") else "FAIL"
+                detail = ""
+                if "error" in value:
+                    detail = f" ({value['error']})"
+                elif "missing" in value and value["missing"]:
+                    detail = f" (missing: {', '.join(value['missing'])})"
+                elif "version" in value:
+                    detail = f" ({value['version']})"
+                print(f"  [{status}] {key}{detail}")
+            else:
+                print(f"  {key}: {value}")
+        print("=" * 45)
+        if all_ok:
+            print("All integration checks passed!")
+        else:
+            print("Some checks failed. Run with --json for details.")
+
+    if not all_ok:
+        sys.exit(1)
+
+
 def _add_json_flag(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--json", action="store_true", default=False, help="JSON 输出模式")
 
@@ -660,7 +826,7 @@ def _add_server_flags(parser: argparse.ArgumentParser) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="stableagent",
-        description="StableAgent V11.4 — Agent Capsule 管理 + CLI Mode 工具",
+        description="StableAgent Capsule — Agent Capsule 管理 + CLI Mode 工具",
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -713,18 +879,18 @@ def main() -> None:
     config_p = mcp_sub.add_parser("config", help="输出 MCP 配置")
     config_p.set_defaults(func=cmd_mcp_config)
 
-    # ---- V11.4: serve ----
+    # ---- serve ----
     serve_p = subparsers.add_parser("serve", help="启动 StableAgent Web 服务")
     _add_server_flags(serve_p)
     serve_p.set_defaults(func=cmd_serve)
 
-    # ---- V11.4: health ----
+    # ---- health ----
     health_cli_p = subparsers.add_parser("health", help="健康检查 (server/MCP/tools)")
     _add_server_flags(health_cli_p)
     _add_json_flag(health_cli_p)
     health_cli_p.set_defaults(func=cmd_health)
 
-    # ---- V11.4: task run ----
+    # ---- task run ----
     task_parser = subparsers.add_parser("task", help="任务管理")
     task_sub = task_parser.add_subparsers(dest="action")
 
@@ -736,7 +902,7 @@ def main() -> None:
     _add_json_flag(run_p)
     run_p.set_defaults(func=cmd_task_run)
 
-    # ---- V11.4: feedback ----
+    # ---- feedback ----
     fb_parser = subparsers.add_parser("feedback", help="反馈管理")
     fb_sub = fb_parser.add_subparsers(dest="action")
 
@@ -762,7 +928,7 @@ def main() -> None:
     _add_json_flag(fb_correct_p)
     fb_correct_p.set_defaults(func=cmd_feedback_correct)
 
-    # ---- V11.4: effectiveness ----
+    # ---- effectiveness ----
     eff_parser = subparsers.add_parser("effectiveness", help="效果评估")
     eff_sub = eff_parser.add_subparsers(dest="action")
 
@@ -802,7 +968,7 @@ def main() -> None:
     _add_json_flag(eff_run_record_p)
     eff_run_record_p.set_defaults(func=cmd_effectiveness_run_record)
 
-    # ---- V11.4: dashboard ----
+    # ---- dashboard ----
     dash_parser = subparsers.add_parser("dashboard", help="Dashboard 管理")
     dash_sub = dash_parser.add_subparsers(dest="action")
 
@@ -812,13 +978,13 @@ def main() -> None:
     _add_server_flags(dash_open_p)
     dash_open_p.set_defaults(func=cmd_dashboard_open)
 
-    # ---- V11.5: doctor ----
+    # ---- doctor ----
     doctor_p = subparsers.add_parser("doctor", help="综合健康检查")
     _add_server_flags(doctor_p)
     _add_json_flag(doctor_p)
     doctor_p.set_defaults(func=cmd_doctor)
 
-    # ---- V11.5: skill ----
+    # ---- skill ----
     skill_parser = subparsers.add_parser("skill", help="技能管理")
     skill_sub = skill_parser.add_subparsers(dest="action")
 
@@ -842,6 +1008,14 @@ def main() -> None:
     skill_promote_p.add_argument("--reason", default="manual promote via CLI", help="晋升原因")
     _add_json_flag(skill_promote_p)
     skill_promote_p.set_defaults(func=cmd_skill_promote)
+
+    # ---- Integration ----
+    int_parser = subparsers.add_parser("integration", help="集成管理")
+    int_sub = int_parser.add_subparsers(dest="action")
+
+    int_doctor_p = int_sub.add_parser("doctor", help="集成环境健康检查")
+    _add_json_flag(int_doctor_p)
+    int_doctor_p.set_defaults(func=cmd_integration_doctor)
 
     args = parser.parse_args()
     if not args.command:
