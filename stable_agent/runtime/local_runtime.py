@@ -40,22 +40,22 @@ class LocalStableAgentRuntime:
             return
 
         try:
-            from stable_agent.gateway.tool_router import ToolRouter
-            from stable_agent.gateway.run_context import RunContext
-
-            # 创建 ToolRouter (会自动初始化 RunStore, EventStream)
-            self._tool_router = ToolRouter()
-
             # 创建 Orchestrator
-            from stable_agent.orchestrator import Orchestrator
-            self._orchestrator = Orchestrator()
+            from stable_agent.orchestrator import StableAgentOrchestrator
+            self._orchestrator = StableAgentOrchestrator()
 
-            # 创建 UnifiedToolRegistry
+            # Registry and router depend on each other. Build the registry first,
+            # then inject the fully constructed router back into it.
             from stable_agent.gateway.unified_tool_registry import UnifiedToolRegistry
-            self._registry = UnifiedToolRegistry(
-                orchestrator=self._orchestrator,
-                tool_router=self._tool_router,
+            from stable_agent.gateway.tool_router import ToolRouter
+            self._registry = UnifiedToolRegistry(orchestrator=self._orchestrator)
+            self._tool_router = ToolRouter(
+                registry=self._registry,
+                security_policy=getattr(self._orchestrator, "security_policy", None),
+                approval_manager=getattr(self._orchestrator, "approval_manager", None),
+                event_bus=getattr(self._orchestrator, "event_bus", None),
             )
+            self._registry._tool_router = self._tool_router
 
             self._initialized = True
             logger.info("LocalStableAgentRuntime initialized successfully")
@@ -76,32 +76,12 @@ class LocalStableAgentRuntime:
         self._ensure_initialized()
 
         try:
-            from stable_agent.gateway.run_context import RunContext
-
-            # 构造 RunContext
             run_id = f"local_{int(time.time() * 1000)}"
-            ctx = RunContext(
-                run_id=run_id,
-                trace_id=f"trace_{run_id}",
-                tool_name=tool_name,
-            )
+            routed_arguments = {**arguments, "run_id": arguments.get("run_id") or run_id}
+            result = self._tool_router.route(tool_name, routed_arguments)
 
-            # 调用 handler
-            result = self._registry.call_tool(ctx, tool_name, arguments)
-
-            # 转换为 MCP-compatible 格式
-            if hasattr(result, 'to_dict'):
-                data = result.to_dict()
-            elif isinstance(result, dict):
-                data = result
-            else:
-                data = {"ok": False, "error": f"Unexpected result type: {type(result)}"}
-
-            return {
-                "content": [{"type": "text", "text": data.get("plain_text", str(data))}],
-                "structuredContent": data,
-                "isError": data.get("is_error", False),
-            }
+            from stable_agent.gateway.response_adapter import ResponseAdapter
+            return ResponseAdapter().to_mcp_content(result)
 
         except Exception as exc:
             logger.exception("Local tool call failed: tool=%s", tool_name)

@@ -113,11 +113,14 @@ def _call_local_runtime(task_input: str, open_dashboard: bool = True) -> dict:
     })
 
     sc = raw.get("structuredContent", {})
+    content = raw.get("content", [])
+    content_text = content[0].get("text", "") if content and isinstance(content[0], dict) else ""
     return {
         "ok": sc.get("ok", not raw.get("isError", False)),
         "run_id": sc.get("run_id", ""),
         "dashboard_url": sc.get("dashboard_url", ""),
         "observer_url": sc.get("observer_url", ""),
+        "output_text": sc.get("output_text") or sc.get("plain_text_zh") or sc.get("plain_text_en") or content_text,
         "missing_required_events": sc.get("missing_required_events", []),
         "understanding_trace": sc.get("understanding_trace"),
         "token_report": sc.get("token_report"),
@@ -357,11 +360,12 @@ def cmd_task_estimate(args: argparse.Namespace) -> None:
     # Risk assessment patterns
     high_risk_patterns = [
         r"rm\s+-rf", r"drop\s+table", r"\bdelete\b", r"force\s+push",
-        r"删除", r"清空", r"\bformat\b", r"sudo\s+rm",
+        r"git\s+push\s+--force", r"\bdeploy\b", r"删除所有文件", r"删除数据库",
+        r"清空数据库", r"\bformat\b", r"sudo\s+rm",
     ]
     medium_risk_patterns = [
-        r"\bdeploy\b", r"\binstall\b", r"\bupdate\b", r"\bmodify\b",
-        r"修改", r"安装",
+        r"\binstall\b", r"\bupdate\b", r"\bmodify\b", r"\bexecute\b",
+        r"修改", r"安装", r"执行", r"写入", r"删除",
     ]
 
     input_lower = task_input.lower()
@@ -788,14 +792,16 @@ def cmd_integration_doctor(args: argparse.Namespace) -> None:
                 continue
             # Extract package name (before ==, >=, ~=, etc.)
             pkg_name = line.split("==")[0].split(">=")[0].split("~=")[0].split("<=")[0].split(">")[0].split("<")[0].strip()
-            # Normalize hyphens to underscores for import
-            import_name = pkg_name.replace("-", "_")
+            dist_name = pkg_name.split("[", 1)[0]
+            import_aliases = {
+                "python-dotenv": "dotenv",
+            }
+            import_name = import_aliases.get(dist_name, dist_name.replace("-", "_"))
             try:
                 importlib.import_module(import_name)
             except ImportError:
-                # Try original name
                 try:
-                    importlib.import_module(pkg_name)
+                    importlib.import_module(dist_name)
                 except ImportError:
                     missing_packages.append(pkg_name)
         checks["requirements"] = {
@@ -832,7 +838,7 @@ def cmd_integration_doctor(args: argparse.Namespace) -> None:
     try:
         from stable_agent.gateway.mcp_gateway import MCPGateway
         gateway = MCPGateway()
-        tools = gateway.list_tools() if hasattr(gateway, "list_tools") else []
+        tools = gateway.registry.list_tools()
         tool_names = [t.get("name", "") if isinstance(t, dict) else getattr(t, "name", "") for t in tools]
         has_os_agent = "stableagent.task.os_agent" in tool_names
         checks["os_agent_tool"] = {"ok": has_os_agent, "tool_count": len(tool_names)}

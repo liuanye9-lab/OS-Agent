@@ -28,3 +28,9 @@ class TestLocalRuntime:
     def test_has_ensure_initialized(self):
         """必须有 _ensure_initialized 方法。"""
         assert hasattr(LocalStableAgentRuntime, "_ensure_initialized")
+
+    def test_health_check_initializes_real_runtime(self):
+        runtime = LocalStableAgentRuntime()
+        result = runtime.health_check()
+        assert result["ok"] is True
+        assert result["initialized"] is True
