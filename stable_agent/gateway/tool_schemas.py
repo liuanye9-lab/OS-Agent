@@ -820,11 +820,153 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
         "risk_level": "low",
     },
+    # ── Computer Use 工具 ──
+    "stableagent.computer.screenshot": {
+        "name": "stableagent.computer.screenshot",
+        "title": "屏幕截图",
+        "description": "截取当前屏幕并返回图片 (base64)",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "region": {"type": "array", "items": {"type": "integer"}, "description": "[x,y,w,h] 截图区域，留空全屏"},
+                "quality": {"type": "integer", "default": 75, "description": "JPEG 压缩质量"},
+            },
+        },
+        "risk_level": "low",
+    },
+    "stableagent.computer.mouse_click": {
+        "name": "stableagent.computer.mouse_click",
+        "title": "鼠标点击",
+        "description": "在指定坐标执行鼠标点击",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "x": {"type": "integer", "description": "屏幕 X 坐标"},
+                "y": {"type": "integer", "description": "屏幕 Y 坐标"},
+                "button": {"type": "string", "default": "left", "enum": ["left", "right", "middle"]},
+                "clicks": {"type": "integer", "default": 1, "description": "点击次数，2=双击"},
+            },
+            "required": ["x", "y"],
+        },
+        "risk_level": "medium",
+    },
+    "stableagent.computer.mouse_move": {
+        "name": "stableagent.computer.mouse_move",
+        "title": "鼠标移动",
+        "description": "移动鼠标到指定坐标",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "x": {"type": "integer"},
+                "y": {"type": "integer"},
+            },
+            "required": ["x", "y"],
+        },
+        "risk_level": "low",
+    },
+    "stableagent.computer.mouse_scroll": {
+        "name": "stableagent.computer.mouse_scroll",
+        "title": "鼠标滚动",
+        "description": "鼠标滚动（正=向上，负=向下）",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "clicks": {"type": "integer", "default": -3},
+            },
+        },
+        "risk_level": "low",
+    },
+    "stableagent.computer.keyboard_type": {
+        "name": "stableagent.computer.keyboard_type",
+        "title": "键盘输入",
+        "description": "模拟键盘输入文本",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "要输入的文本"},
+            },
+            "required": ["text"],
+        },
+        "risk_level": "medium",
+    },
+    "stableagent.computer.keyboard_hotkey": {
+        "name": "stableagent.computer.keyboard_hotkey",
+        "title": "组合键",
+        "description": "执行组合键操作（如 cmd+c）",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "keys": {"type": "array", "items": {"type": "string"}, "description": "按键列表"},
+            },
+            "required": ["keys"],
+        },
+        "risk_level": "medium",
+    },
+    "stableagent.computer.keyboard_press": {
+        "name": "stableagent.computer.keyboard_press",
+        "title": "按键",
+        "description": "按下指定按键 (enter/tab/escape 等)",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string"},
+                "presses": {"type": "integer", "default": 1},
+            },
+            "required": ["key"],
+        },
+        "risk_level": "low",
+    },
+    "stableagent.computer.screen_info": {
+        "name": "stableagent.computer.screen_info",
+        "title": "屏幕信息",
+        "description": "获取屏幕分辨率和鼠标位置",
+        "input_schema": {"type": "object", "properties": {}},
+        "risk_level": "low",
+    },
+    # ── Local Terminal 工具 ──
+    "stableagent.terminal.run_command": {
+        "name": "stableagent.terminal.run_command",
+        "title": "终端命令",
+        "description": "在本地终端执行 shell 命令",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "Shell 命令"},
+                "cwd": {"type": "string", "description": "工作目录"},
+                "timeout": {"type": "integer", "default": 30},
+            },
+            "required": ["command"],
+        },
+        "risk_level": "medium",
+    },
+    "stableagent.terminal.write_file": {
+        "name": "stableagent.terminal.write_file",
+        "title": "写文件",
+        "description": "写入文件到本地路径",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "文件路径"},
+                "content": {"type": "string", "description": "文件内容"},
+            },
+            "required": ["path", "content"],
+        },
+        "risk_level": "medium",
+    },
+    "stableagent.terminal.read_file": {
+        "name": "stableagent.terminal.read_file",
+        "title": "读文件",
+        "description": "读取本地文件内容",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "文件路径"},
+            },
+            "required": ["path"],
+        },
+        "risk_level": "low",
+    },
 }
-
-# ---------------------------------------------------------------------------
-# 头像状态映射 —— 事件类型 → 头像动画状态
-# ---------------------------------------------------------------------------
 
 AVATAR_STATE_MAP: dict[str, str] = {
     "mcp.call.received": "listening",

@@ -259,6 +259,81 @@ class RunStore:
         active.sort(key=lambda r: r["started_at"], reverse=True)
         return active[:limit]
 
+    def list_recent_runs(self, limit: int = 10) -> dict[str, Any]:
+        """列出所有最近 runs（含已完成/失败），按时间倒序。
+
+        V6.3: 首页着陆页需要此接口。
+
+        Args:
+            limit: 最大返回数量，默认 10。
+
+        Returns:
+            {"total": int, "runs": list, "success_rate": float}
+        """
+        all_runs = []
+        for run_id, run in self._runs.items():
+            # 提取 user_task（从第一个事件中查找）
+            user_task = ""
+            if run["events"]:
+                first_evt = run["events"][0]
+                if isinstance(first_evt, dict):
+                    user_task = (first_evt.get("user_task") or
+                                 first_evt.get("task") or
+                                 first_evt.get("data", {}).get("task", "") if isinstance(first_evt.get("data"), dict) else "")
+            all_runs.append({
+                "run_id": run_id,
+                "status": run["status"],
+                "event_count": len(run["events"]),
+                "started_at": run["started_at"],
+                "user_task": user_task,
+            })
+
+        # 按 started_at 倒序
+        all_runs.sort(key=lambda r: r["started_at"], reverse=True)
+        total = len(all_runs)
+
+        # 计算成功率
+        completed = sum(1 for r in all_runs if r["status"] == "completed")
+        failed = sum(1 for r in all_runs if r["status"] == "failed")
+        finished = completed + failed
+        success_rate = round(completed / finished * 100, 1) if finished > 0 else 0
+
+        # 尝试从 SQLite 补充历史数据（内存中可能只有活跃 runs）
+        if self._db_path and total < limit:
+            try:
+                conn = sqlite3.connect(self._db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.execute(
+                    "SELECT run_id, status, started_at, updated_at FROM runs ORDER BY started_at DESC LIMIT ?",
+                    (limit + total,)
+                )
+                existing_ids = {r["run_id"] for r in all_runs}
+                for row in cursor:
+                    if row["run_id"] not in existing_ids:
+                        all_runs.append({
+                            "run_id": row["run_id"],
+                            "status": row["status"],
+                            "event_count": 0,
+                            "started_at": row["started_at"],
+                            "user_task": "",
+                        })
+                conn.close()
+                # 重新排序和截断
+                all_runs.sort(key=lambda r: r.get("started_at", 0), reverse=True)
+                total = len(all_runs)
+                completed_all = sum(1 for r in all_runs if r["status"] == "completed")
+                failed_all = sum(1 for r in all_runs if r["status"] == "failed")
+                finished_all = completed_all + failed_all
+                success_rate = round(completed_all / finished_all * 100, 1) if finished_all > 0 else 0
+            except Exception as exc:
+                logger.debug("list_recent_runs SQLite fallback failed: %s", exc)
+
+        return {
+            "total": total,
+            "runs": all_runs[:limit],
+            "success_rate": success_rate,
+        }
+
     def mark_completed(self, run_id: str) -> None:
         """将 run 标记为已完成。
 

@@ -180,6 +180,19 @@ class UnifiedToolRegistry:
         self._register("stableagent.token.report", self._h_token_report)
         self._register("stableagent.token.run", self._h_token_run)
         self._register("stableagent.token.summary", self._h_token_summary)
+        # Computer Use 工具
+        self._register("stableagent.computer.screenshot", self._h_computer_screenshot)
+        self._register("stableagent.computer.mouse_click", self._h_computer_mouse_click)
+        self._register("stableagent.computer.mouse_move", self._h_computer_mouse_move)
+        self._register("stableagent.computer.mouse_scroll", self._h_computer_mouse_scroll)
+        self._register("stableagent.computer.keyboard_type", self._h_computer_keyboard_type)
+        self._register("stableagent.computer.keyboard_hotkey", self._h_computer_keyboard_hotkey)
+        self._register("stableagent.computer.keyboard_press", self._h_computer_keyboard_press)
+        self._register("stableagent.computer.screen_info", self._h_computer_screen_info)
+        # Local Terminal 工具
+        self._register("stableagent.terminal.run_command", self._h_terminal_run_command)
+        self._register("stableagent.terminal.write_file", self._h_terminal_write_file)
+        self._register("stableagent.terminal.read_file", self._h_terminal_read_file)
 
     # ------------------------------------------------------------------
     # 辅助方法
@@ -1935,3 +1948,74 @@ class UnifiedToolRegistry:
         except Exception as e:
             return self._make_result(ctx, tool_name, ok=False, is_error=True,
                                      plain_text=f"纠正失败: {e}")
+
+    # ── Computer Use Handlers ──
+
+    def _h_computer_action(self, ctx: RunContext, action: str, args: dict[str, Any]) -> StableAgentToolResult:
+        """通用 Computer Use 操作处理器。"""
+        tool_name = f"stableagent.computer.{action}"
+        try:
+            from stable_agent.computer_use import execute_action
+            result = execute_action(action, args)
+            return self._make_result(
+                ctx, tool_name,
+                ok=result.ok,
+                data=result.to_dict().get("data", {}),
+                plain_text=result.message,
+                is_error=not result.ok,
+            )
+        except Exception as e:
+            return self._make_result(ctx, tool_name, ok=False, is_error=True,
+                                     plain_text=f"Computer Use 操作失败: {e}")
+
+    def _h_computer_screenshot(self, ctx, args):
+        return self._h_computer_action(ctx, "screenshot", args)
+
+    def _h_computer_mouse_click(self, ctx, args):
+        return self._h_computer_action(ctx, "mouse_click", args)
+
+    def _h_computer_mouse_move(self, ctx, args):
+        return self._h_computer_action(ctx, "mouse_move", args)
+
+    def _h_computer_mouse_scroll(self, ctx, args):
+        return self._h_computer_action(ctx, "mouse_scroll", args)
+
+    def _h_computer_keyboard_type(self, ctx, args):
+        return self._h_computer_action(ctx, "keyboard_type", args)
+
+    def _h_computer_keyboard_hotkey(self, ctx, args):
+        return self._h_computer_action(ctx, "keyboard_hotkey", args)
+
+    def _h_computer_keyboard_press(self, ctx, args):
+        return self._h_computer_action(ctx, "keyboard_press", args)
+
+    def _h_computer_screen_info(self, ctx, args):
+        return self._h_computer_action(ctx, "get_screen_info", args)
+
+    # ── Local Terminal Handlers ──
+
+    def _h_terminal_action(self, ctx: RunContext, action: str, args: dict[str, Any]) -> StableAgentToolResult:
+        """通用 Terminal 操作处理器。"""
+        tool_name = f"stableagent.terminal.{action}"
+        try:
+            from stable_agent.local_terminal import execute_action
+            result = execute_action(action, args)
+            return self._make_result(
+                ctx, tool_name,
+                ok=result.ok,
+                data=result.to_dict().get("data", {}),
+                plain_text=result.message,
+                is_error=not result.ok,
+            )
+        except Exception as e:
+            return self._make_result(ctx, tool_name, ok=False, is_error=True,
+                                     plain_text=f"Terminal 操作失败: {e}")
+
+    def _h_terminal_run_command(self, ctx, args):
+        return self._h_terminal_action(ctx, "run_command", args)
+
+    def _h_terminal_write_file(self, ctx, args):
+        return self._h_terminal_action(ctx, "write_file", args)
+
+    def _h_terminal_read_file(self, ctx, args):
+        return self._h_terminal_action(ctx, "read_file", args)

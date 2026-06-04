@@ -175,15 +175,7 @@ def create_app() -> FastAPI:
     except Exception as exc:
         logger.warning("Effectiveness Dashboard init failed: %s", exc)
 
-    # V11.3: Effectiveness page route
-    effectiveness_template = os.path.join(templates_dir, "effectiveness.html")
-    if os.path.exists(effectiveness_template):
-        @app.get("/effectiveness")
-        async def effectiveness_page():
-            with open(effectiveness_template, "r", encoding="utf-8") as f:
-                return HTMLResponse(content=f.read())
-        logger.info("Effectiveness page route registered")
-    else:
-        logger.warning("effectiveness.html template not found")
+    # V11.3: Effectiveness page route — 已在 register_pages 中注册，此处跳过避免重复
+    logger.info("Effectiveness page route registered via register_pages")
 
     return app

@@ -10,6 +10,23 @@ logger = logging.getLogger("uvicorn")
 
 
 def register_run_routes(app: FastAPI, gateway_run_store=None, dash_sync=None) -> None:
+    @app.get("/api/runs/recent")
+    async def api_recent_runs(limit: int = 10):
+        """V6.3: 列出最近 runs（含已完成/失败），首页着陆页使用。"""
+        try:
+            store = gateway_run_store
+            if store is None:
+                return {"total": 0, "runs": [], "success_rate": 0}
+            if hasattr(store, 'list_recent_runs'):
+                return store.list_recent_runs(limit=limit)
+            # fallback: 使用 list_active_runs
+            if hasattr(store, 'list_active_runs'):
+                runs = store.list_active_runs(limit=limit)
+                return {"total": len(runs), "runs": runs, "success_rate": 0}
+            return {"total": 0, "runs": [], "success_rate": 0}
+        except Exception as e:
+            return {"total": 0, "runs": [], "success_rate": 0, "error": str(e)}
+
     @app.post("/api/runs")
     async def api_create_run(request: Request):
         body = await request.json()

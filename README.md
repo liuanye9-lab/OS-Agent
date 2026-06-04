@@ -103,6 +103,14 @@ PYTHONPATH=. .venv/bin/python -m stable_agent.cli task run \
 | 学习计划 | Skill Patch，把失败经验变成可复用规则 |
 | 书包/U 盘 | Agent Capsule，打包你的记忆、规则、习惯和评测标准 |
 | 仪表盘 | Dashboard，把 Agent 每一步理解、压缩、判断、学习过程可视化 |
+| 免疫系统 | Context Guard，像白细胞一样拦截有害输入、保护关键上下文不被污染 |
+| 黑匣子/飞行记录仪 | Run Trace，记录每一步操作，出问题时可以回溯完整事故链 |
+| 导航仪 | Understanding Trace，在任务出发前先规划路线，防止 Agent 开错方向 |
+| 驾校教练 | Human Review，新规则进入长期记忆前的最后一道人工把关 |
+| 健身计划 | Skill Evolution，渐进式训练，规则越练越强、越用越精准 |
+| 体检报告 | Effectiveness Dashboard，用量化指标衡量健康度，不靠感觉靠数据 |
+| 处方药方 | Skill Patch，针对具体诊断出的问题开出的定向修复方案 |
+| 记忆宫殿 | Agent Capsule，结构化的长期存储，每个房间放不同类型的记忆 |
 
 ---
 
@@ -125,6 +133,25 @@ AI 可能会：
 StableAgent OS 想解决的是：
 
 > **不是让模型“变聪明”，而是给模型外面装一层能记忆、能复盘、能约束、能可视化的使用层。**
+
+---
+
+## 一句话类比总览：把 StableAgent OS 想象成什么？
+
+想象你是一个每天去健身房的人。大模型（Claude / GPT / Qwen）是你自己的身体——天生有力量，但没人告诉你该怎么练、练多少、哪些动作容易受伤。
+
+StableAgent OS 就是你的 **私人健身教练 + 营养师 + 健康档案系统**：
+
+- **教练**（Understanding Trace）会在你开练之前先纠正姿势，确保你没理解错今天的训练目标；
+- **护腰带**（Context Guard）在大重量训练时保护你的腰椎，就像保护关键约束不被上下文压缩丢掉；
+- **训练日志**（Run Trace + Bad Case Bank）记下每一次动作和失误，下次训练不重复犯错；
+- **渐进式训练计划**（Skill Evolution）根据你过去的表现动态调整训练强度和内容；
+- **体检报告**（Effectiveness Dashboard）每月用数据告诉你，体脂降了没有、力量涨了没有，而不是光凭感觉说"好像好了一点"；
+- **运动背包**（Agent Capsule）把你的训练计划、饮食偏好、伤病史全部打包，换一个健身房也能无缝继续；
+- **免疫系统**（Context Guard）在你身体接触到不该吃的东西时自动拦截，就像拦截有害输入、防止上下文被污染；
+- **驾校教练**（Human Review）在你正式上路前做最后检查——规则必须经过人工确认才能进入长期记忆。
+
+> 一句话总结：大模型是你的身体，StableAgent OS 是让你**科学训练、不受伤、持续进步**的整套保障体系。
 
 ---
 
@@ -181,27 +208,47 @@ StableAgent OS 的目标不是做一个“更大的 Agent”，而是做一个 *
 
 ```mermaid
 flowchart TB
-    User[用户 / AI Coding 重度用户] --> Client[Claude Code / Codex / Trae / Cursor]
-    Client --> MCP[MCP Gateway<br/>55 tools]
-    MCP --> OSAgent[stableagent.task.os_agent]
+    User["👤 用户<br/>AI Coding 重度使用者"] --> Client["💻 Coding Agent<br/>Claude Code / Codex / Trae / Cursor"]
+    Client --> MCP["🔌 MCP Gateway<br/>55 tools / HTTP + stdio + CLI"]
+    MCP --> OSAgent["⚙️ stableagent.task.os_agent<br/>任务主调度引擎"]
 
-    OSAgent --> U[Understanding Trace<br/>语义理解轨迹]
-    OSAgent --> C[Context Guard<br/>上下文保护]
-    OSAgent --> T[Token Budget<br/>Token 预算]
-    OSAgent --> M[Agent Capsule<br/>个人记忆胶囊]
-    OSAgent --> E[Evaluation<br/>评测与失败归因]
-    OSAgent --> S[Skill Evolution<br/>规则进化]
+    subgraph CORE["🧠 StableAgent OS 核心六大模块"]
+        direction TB
+        U["🧭 Understanding Trace<br/>语义理解轨迹<br/>解析真实意图 + 表达习惯匹配"]
+        C["🛡️ Context Guard<br/>上下文免疫系统<br/>拦截有害输入 + 保护关键约束"]
+        T["📊 Token Budget<br/>Token 预算管理器<br/>智能压缩 + 关键信息优先保留"]
+        M["🎒 Agent Capsule<br/>个人记忆胶囊<br/>习惯 / 偏好 / 项目记忆打包"]
+        E["🔬 Evaluation<br/>评测与失败归因<br/>Bad Case 记录 + 回归测试生成"]
+        S["💪 Skill Evolution<br/>规则渐进进化<br/>Skill Patch 候选 + 验证 + 沉淀"]
+    end
 
-    U --> Dash[Dashboard Observer]
+    OSAgent --> U
+    OSAgent --> C
+    OSAgent --> T
+    OSAgent --> M
+    OSAgent --> E
+    OSAgent --> S
+
+    subgraph OBSERVE["📺 可视化观测层"]
+        Dash["Dashboard Observer<br/>Run Trace / Understanding / Token / Memory / BadCase / Skill"]
+        EffDash["Effectiveness Dashboard<br/>A/B 对比数据 + 量化指标"]
+    end
+
+    U --> Dash
     C --> Dash
     T --> Dash
     M --> Dash
     E --> Dash
     S --> Dash
+    E --> EffDash
+    S --> EffDash
 
-    Dash --> Human[用户人工确认 / 纠正 / 审批]
-    Human --> Capsule[长期记忆与规则沉淀]
-    Capsule --> OSAgent
+    subgraph LOOP["🔄 反馈闭环"]
+        Dash --> Human["👨‍🏫 Human Review<br/>用户人工确认 / 纠正 / 审批"]
+        Human --> Capsule["💾 长期记忆与规则沉淀<br/>.stableagent-capsule/"]
+    end
+
+    Capsule -->|"下次任务自动加载"| OSAgent
 ```
 
 ---
@@ -228,28 +275,122 @@ StableAgent OS 的核心不是一次任务，而是长期积累的 **Agent Capsu
 
 > 不管你今天用 Claude Code，明天用 Codex，后天换 Trae，你的习惯、错题本、评测标准和任务边界都可以继续迁移。
 
+### 记忆宫殿：Agent Capsule 的房间布局
+
+把 Agent Capsule 想象成一座记忆宫殿，每个房间存放不同类型的记忆：
+
+```mermaid
+flowchart TB
+    subgraph PALACE["🏛️ 记忆宫殿 Agent Capsule"]
+        direction TB
+
+        subgraph ROOM1["🗣️ 表达厅 profile/"]
+            P1["不要AI味 = 避免模板化表达"]
+            P2["简洁 = 少用形容词"]
+            P3["专业 = 用行业术语"]
+        end
+
+        subgraph ROOM2["🧠 记忆阁 memory/"]
+            M1["项目架构偏好"]
+            M2["常用技术栈"]
+            M3["个人编码风格"]
+        end
+
+        subgraph ROOM3["🛠️ 技能库 skills/"]
+            S1["已验证的工作规则"]
+            S2["经过审核的 Skill Patch"]
+            S3["渐进式训练成果"]
+        end
+
+        subgraph ROOM4["❌ 错题室 bad_cases/"]
+            B1["过度修改案例"]
+            B2["遗忘约束案例"]
+            B3["跑偏记录"]
+        end
+
+        subgraph ROOM5["📋 考场 evals/"]
+            E1["回归测试用例"]
+            E2["个人评测标准"]
+            E3["质量红线"]
+        end
+
+        subgraph ROOM6["💰 账房 token_ledger/"]
+            T1["Token 使用记录"]
+            T2["压缩节省统计"]
+            T3["预算分配历史"]
+        end
+
+        subgraph ROOM7["🤖 画像室 model_profiles/"]
+            MP1["Claude 能力画像"]
+            MP2["GPT 能力画像"]
+            MP3["Qwen 能力画像"]
+        end
+
+        subgraph ROOM8["📊 体检室 effectiveness/"]
+            EF1["A/B 对比数据"]
+            EF2["跑偏率趋势"]
+            EF3["返工次数统计"]
+        end
+    end
+
+    ROOM1 -.->|"表达习惯指导理解"| ROOM2
+    ROOM4 -.->|"错题生成考题"| ROOM5
+    ROOM5 -.->|"验证通过的技能"| ROOM3
+    ROOM8 -.->|"数据驱动优化"| ROOM3
+
+    style PALACE fill:#fefce8,stroke:#eab308
+    style ROOM1 fill:#ede9fe,stroke:#a78bfa
+    style ROOM2 fill:#dbeafe,stroke:#60a5fa
+    style ROOM3 fill:#d1fae5,stroke:#34d399
+    style ROOM4 fill:#fee2e2,stroke:#f87171
+    style ROOM5 fill:#fef3c7,stroke:#fbbf24
+    style ROOM6 fill:#fce7f3,stroke:#f472b6
+    style ROOM7 fill:#e0e7ff,stroke:#818cf8
+    style ROOM8 fill:#ecfdf5,stroke:#10b981
+```
+
+每个房间独立维护，但彼此之间有引用关系。当你换工具（Claude Code → Codex → Trae）时，整座宫殿直接搬走——这就是"可迁移"的意义。
+
 ---
 
 ## 一次任务在 StableAgent 里如何流动？
 
 ```mermaid
 sequenceDiagram
-    participant U as 用户
-    participant C as Coding Agent
-    participant S as StableAgent OS
-    participant D as Dashboard
-    participant P as Agent Capsule
+    participant U as 👤 用户
+    participant C as 💻 Coding Agent
+    participant S as ⚙️ StableAgent OS
+    participant D as 📺 Dashboard
+    participant P as 🎒 Agent Capsule
 
     U->>C: 继续优化这个项目，不要AI味，不要大范围重构
+    Note right of U: 用户发出带约束的任务指令
+
     C->>S: 调用 stableagent.task.os_agent
-    S->>S: 生成 Understanding Trace
-    S->>P: 读取表达习惯与项目记忆
-    S->>S: 保护关键约束，压缩上下文
-    S->>S: 生成 Token Report
-    S->>D: 写入事件流和可视化面板
-    D-->>U: 展示理解轨迹、Token预算、记忆、bad case
-    U->>D: 纠正 / 记住 / 下次别这样
-    D->>P: 写入表达习惯、bad case、skill patch
+    Note over C,S: 生成唯一 run_id，开始全链路追踪
+
+    S->>S: 🧭 生成 Understanding Trace
+    Note right of S: 解析真实意图<br/>匹配表达习惯（不要AI味 = 避免模板化）
+
+    S->>P: 🎒 读取表达习惯与项目记忆
+    P-->>S: 返回 profile + memory + skills
+    Note over S,P: 记忆宫殿自动检索相关记忆
+
+    S->>S: 🛡️ Context Guard 激活
+    Note right of S: 保护关键约束不被压缩<br/>拦截可能的有害输入
+
+    S->>S: 📊 生成 Token Report
+    Note right of S: 预算分配 + 智能压缩<br/>关键信息优先保留
+
+    S->>D: 📺 写入事件流和可视化面板
+    D-->>U: 展示理解轨迹、Token预算、记忆命中、bad case 预警
+    Note over D,U: 用户第一次看到 Agent 的完整脑内过程
+
+    U->>D: 👨‍🏫 纠正 / 记住这个 / 下次别这样
+    Note right of U: 用户反馈进入结构化闭环
+
+    D->>P: 💾 写入表达习惯、bad case、skill patch 候选
+    Note over D,P: 经验沉淀为可迁移的长期资产
 ```
 
 ---
@@ -311,6 +452,53 @@ flowchart TB
 关键原则：
 
 > 失败经验不能直接污染长期规则，必须经过验证和人工审核。
+
+### 免疫系统类比：从"病毒入侵"到"产生抗体"
+
+把整个反馈闭环想象成人体免疫系统的工作方式：
+
+```mermaid
+flowchart TB
+    subgraph INFECTION["🦠 病毒入侵（任务中出现 Bad Case）"]
+        A["用户执行任务<br/>Agent 犯错或跑偏"] --> B["用户反馈<br/>下次别这样！"]
+    end
+
+    subgraph DETECT["🔍 免疫识别（诊断与记录）"]
+        B --> C["BadCaseRecord<br/>🧫 病原体登记<br/>记录失败案例的完整上下文"]
+        C --> D["归因分析<br/>🔬 病理分析<br/>到底是什么导致了这个错误？"]
+    end
+
+    subgraph ANTIBODY["💊 抗体生产（生成修复方案）"]
+        D --> E["SkillPatchCandidate<br/>🧬 抗体候选<br/>针对诊断结果开出处方"]
+        E --> F["RegressionValidationRunner<br/>🧪 抗体有效性测试<br/>跑回归测试验证修复"]
+    end
+
+    subgraph DEPLOY["🛡️ 免疫记忆（部署与保护）"]
+        F -->|测试通过| G["HumanReviewQueue<br/>👨‍⚕️ 专家会诊<br/>人工确认抗体方案"]
+        F -->|测试失败| H["❌ 丢弃无效抗体<br/>不进入长期规则"]
+        G --> I["✅ 长期 Skill 沉淀<br/>💉 抗体正式入库"]
+        I --> J["下次同类任务自动识别<br/>🛡️ 免疫应答自动触发"]
+    end
+
+    J -.->|"免疫力越来越强<br/>同类错误不再复发"| A
+
+    style INFECTION fill:#fee2e2,stroke:#f87171
+    style DETECT fill:#fef3c7,stroke:#fbbf24
+    style ANTIBODY fill:#dbeafe,stroke:#60a5fa
+    style DEPLOY fill:#d1fae5,stroke:#34d399
+```
+
+这个类比的关键对应关系：
+
+| 免疫系统 | StableAgent OS | 说明 |
+|---|---|---|
+| 病毒/病原体 | Bad Case（错误案例） | 任务中出现的跑偏、过度修改、遗忘约束 |
+| 免疫识别 | 归因分析 | 诊断错误的根本原因，而不是表面症状 |
+| 抗体生产 | Skill Patch 候选 | 针对特定问题生成定向修复方案 |
+| 抗体测试 | 回归验证 | 确保新抗体不会误伤正常功能 |
+| 专家会诊 | Human Review | 人工确认是最后一道安全门 |
+| 免疫记忆 | 长期 Skill 沉淀 | 下次同类问题自动识别、自动防御 |
+| 免疫力增强 | 规则越用越精准 | 随着使用积累，系统防御力持续增强 |
 
 ---
 
@@ -729,6 +917,65 @@ StableAgent OS 的底层判断是：
 发动机升级当然重要，但如果没有稳定的驾驶系统，长任务依然会跑偏。
 
 StableAgent OS 想做的就是这套系统。
+
+---
+
+## 可视化对比：有没有 StableAgent 差在哪？
+
+同样是让 AI Coding 工具干活，有和没有 StableAgent 的体验完全不同：
+
+```mermaid
+flowchart LR
+    subgraph WITHOUT["❌ 没有 StableAgent：盲开模式"]
+        direction TB
+        W1["用户说：不要大范围重构"] --> W2["Agent 直接开始改"]
+        W2 --> W3["改了 12 个无关文件"]
+        W3 --> W4["用户发现时已经太晚"]
+        W4 --> W5["回滚 + 重来 + 同样的错"]
+        W5 -.->|"下次继续犯"| W2
+    end
+
+    subgraph WITH["✅ 有 StableAgent：全程护航"]
+        direction TB
+        V1["用户说：不要大范围重构"] --> V2["Understanding Trace 解析意图"]
+        V2 --> V3["Context Guard 保护约束"]
+        V3 --> V4["Token Budget 智能压缩"]
+        V4 --> V5["Dashboard 展示每一步"]
+        V5 --> V6["用户实时看到执行轨迹"]
+        V6 --> V7["反馈沉淀为长期规则"]
+        V7 -.->|"下次自动防御"| V2
+    end
+
+    style WITHOUT fill:#fee2e2,stroke:#f87171
+    style WITH fill:#d1fae5,stroke:#34d399
+```
+
+### 逐项对比表
+
+| 维度 | ❌ 没有 StableAgent | ✅ 有 StableAgent | 差距 |
+|---|---|---|---|
+| **意图理解** | Agent 自己猜你想要什么 | Understanding Trace 先解析意图、匹配表达习惯 | 减少误解，少跑偏 |
+| **约束保护** | 说完"不要重构"，Agent 下一轮就忘了 | Context Guard 像免疫系统一样持续保护关键约束 | 说了就记住，不会遗忘 |
+| **上下文管理** | Token 爆了就让模型自己压缩，关键信息可能被丢 | Token Budget 智能分配，关键约束优先保留 | 不丢关键信息，Token 更省钱 |
+| **犯错后** | 同一个错误反复出现，靠用户记忆提醒 | Bad Case 自动记录 → 生成回归测试 → 产出 Skill Patch | 同一个错不犯第二次 |
+| **经验积累** | 每次对话独立，经验无法沉淀 | 经验进入 Agent Capsule，跨工具、跨项目迁移 | 越用越懂你 |
+| **可视化** | 黑箱执行，不知道 Agent 怎么想的 | Dashboard 六大面板实时展示每一步 | 从黑箱变成透明 |
+| **效果验证** | "好像快了一点"凭感觉 | Effectiveness Dashboard A/B 数据对比 | 用数据证明，不靠感觉 |
+| **换工具成本** | 换一个 AI 工具，所有习惯要重新教 | Agent Capsule 一键迁移，习惯跟着走 | 零成本切换 |
+
+### 类比理解
+
+```text
+没有 StableAgent 的 AI Coding：
+  像一个没有导航、没有行车记录仪、没有保险的司机
+  —— 每次出发都靠运气，出了事故没有记录，下次继续犯同样的错。
+
+有 StableAgent 的 AI Coding：
+  像一个配了导航仪 + 行车记录仪 + 全险 + 驾校教练的司机
+  —— 出发前规划路线，全程有记录，出了事故有回溯，教练还会帮你总结经验。
+```
+
+> 本质上，StableAgent OS 不是让模型变强，而是让**使用模型的过程**变得可控、可追溯、可成长。
 
 ---
 

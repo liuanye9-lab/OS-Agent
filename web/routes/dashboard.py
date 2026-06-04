@@ -30,7 +30,12 @@ def register_pages(app, templates_dir: str) -> None:
 
     @app.get("/")
     async def root():
-        # V6.2: 默认首页重定向到 run_observer（推荐入口）
+        # V6.3: 首页展示系统状态着陆页（而非空 observer）
+        _home = os.path.join(templates_dir, "home.html")
+        if os.path.exists(_home):
+            with open(_home, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+        # fallback: 直接提供 observer
         if os.path.exists(_observer):
             with open(_observer, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
@@ -41,17 +46,17 @@ def register_pages(app, templates_dir: str) -> None:
 
     @app.get("/dashboard/v2")
     async def dashboard_v2():
-        # V6.2: 已收敛到 observer，302 重定向
+        # V6.3: 已收敛到首页着陆
         return HTMLResponse(
-            content='<html><head><meta http-equiv="refresh" content="0;url=/observer"></head>'
-            '<body><p>重定向到 <a href="/observer">实时观察器</a>...</p></body></html>',
+            content='<html><head><meta http-equiv="refresh" content="0;url=/"></head>'
+            '<body><p>重定向到 <a href="/">StableAgent</a>...</p></body></html>',
             status_code=302,
-            headers={"Location": "/observer"},
+            headers={"Location": "/"},
         )
 
     @app.get("/runs/{run_id}")
     async def run_page(run_id: str):
-        # V6.2: /runs/{id} 改为 redirect 到 observer
+        # V6.3: /runs/{id} 改为 redirect 到 observer 详情页
         return HTMLResponse(
             content=f'<html><head><meta http-equiv="refresh" content="0;url=/observe/{run_id}"></head>'
             f'<body><p>重定向到 <a href="/observe/{run_id}">实时观察器</a>...</p></body></html>',
@@ -61,12 +66,12 @@ def register_pages(app, templates_dir: str) -> None:
 
     @app.get("/dashboard/v3")
     async def dashboard_v3():
-        # V6.2: 重定向到 observer
+        # V6.3: 重定向到首页着陆
         return HTMLResponse(
-            content='<html><head><meta http-equiv="refresh" content="0;url=/observer"></head>'
-            '<body><p>重定向到 <a href="/observer">实时观察器</a>...</p></body></html>',
+            content='<html><head><meta http-equiv="refresh" content="0;url=/"></head>'
+            '<body><p>重定向到 <a href="/">StableAgent</a>...</p></body></html>',
             status_code=302,
-            headers={"Location": "/observer"},
+            headers={"Location": "/"},
         )
 
     # SaaS pages

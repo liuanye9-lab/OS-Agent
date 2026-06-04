@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StableAgent OS</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --glass-bg: rgba(255,255,255,0.72);
+    --glass-border: rgba(0,0,0,0.06);
+    --text: #1d1d1f;
+    --text-secondary: #86868b;
+    --accent: #0071e3;
+    --accent-light: #e8f0fe;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --card-radius: 16px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box }
+  body {
+    font-family: var(--font);
+    background: linear-gradient(135deg, #f5f5f7 0%, #e8e8ed 30%, #f0f0f5 60%, #f5f5f7 100%);
+    background-size: 400% 400%;
+    animation: bgFlow 20s ease infinite;
+    color: var(--text);
+    min-height: 100vh;
+  }
+  @keyframes bgFlow {
+    0%, 100% { background-position: 0% 50% }
+    50% { background-position: 100% 50% }
+  }
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-bottom: 1px solid var(--glass-border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .top-bar .brand {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .top-bar .brand span { color: var(--accent); }
+  .top-bar nav { display: flex; gap: 16px; align-items: center; }
+  .top-bar nav a {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .top-bar nav a:hover { background: rgba(0,0,0,0.04); color: var(--text); }
+  .health-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  .health-dot.online { background: var(--green); }
+  .health-dot.offline { background: var(--red); }
+  .health-dot.loading { background: var(--orange); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+  .hero {
+    text-align: center;
+    padding: 48px 20px 36px;
+  }
+  .hero h1 {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+  }
+  .hero p {
+    font-size: 16px;
+    color: var(--text-secondary);
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 700px) { .status-grid { grid-template-columns: 1fr; } }
+  .stat-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--card-radius);
+    padding: 20px;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .stat-card .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .stat-card .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+  .runs-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .run-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    transition: background 0.15s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+  }
+  .run-item:last-child { border-bottom: none; }
+  .run-item:hover { background: rgba(0,113,227,0.04); }
+  .run-item .run-info { flex: 1; }
+  .run-item .run-task {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 2px;
+    color: var(--text);
+  }
+  .run-item .run-meta {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: "SF Mono", "Fira Code", monospace;
+  }
+  .run-item .run-status {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .run-status.completed { background: #e8f5e9; color: #2e7d32; }
+  .run-status.running { background: #e8f0fe; color: #0071e3; }
+  .run-status.failed { background: #fbe9e7; color: #bf360c; }
+  .run-status.pending { background: #f5f5f5; color: #757575; }
+  .empty-runs {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+  .empty-runs .empty-icon {
+    font-size: 36px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+  }
+  .quick-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    backdrop-filter: blur(12px);
+    transition: all 0.15s;
+  }
+  .action-btn:hover { background: rgba(0,113,227,0.08); border-color: var(--accent); }
+  .action-btn.primary { background: var(--accent); color: #fff; border: none; }
+  .action-btn.primary:hover { opacity: 0.9; }
+  .footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <div class="brand">Stable<span>Agent</span> OS</div>
+  <nav>
+    <span id="healthStatus"><span class="health-dot loading"></span>检测中...</span>
+    <a href="/connect">接入指南</a>
+    <a href="/observer">观察器</a>
+    <a href="/effectiveness">效果评估</a>
+    <a href="/docs">API 文档</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="hero">
+    <h1>StableAgent OS</h1>
+    <p>自我进化的 AI Agent 操作系统。越用越好，从每次任务中学习。</p>
+  </div>
+
+  <div class="status-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="totalRuns">--</div>
+      <div class="stat-label">总运行次数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="successRate">--</div>
+      <div class="stat-label">成功率</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="activeTools">--</div>
+      <div class="stat-label">可用工具</div>
+    </div>
+  </div>
+
+  <div class="quick-actions">
+    <a href="/connect" class="action-btn primary">接入 Agent</a>
+    <a href="/observer" class="action-btn">实时观察器</a>
+    <a href="/effectiveness" class="action-btn">效果评估</a>
+    <a href="/docs" class="action-btn">API 文档</a>
+  </div>
+
+  <div class="section-title">最近运行</div>
+  <div class="runs-card" id="runsCard">
+    <div class="empty-runs" id="runsLoading">
+      <div class="empty-icon">...</div>
+      加载中...
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  StableAgent OS V6-Professional
+</div>
+
+<script>
+// Health check
+fetch('/api/health').then(r => r.json()).then(d => {
+  const el = document.getElementById('healthStatus');
+  if (d && (d.status === 'ok' || d.status === 'healthy')) {
+    el.innerHTML = '<span class="health-dot online"></span>在线';
+    if (d.tools_count) document.getElementById('activeTools').textContent = d.tools_count;
+  } else {
+    el.innerHTML = '<span class="health-dot offline"></span>离线';
+  }
+}).catch(() => {
+  document.getElementById('healthStatus').innerHTML = '<span class="health-dot offline"></span>离线';
+});
+
+// Load recent runs
+fetch('/api/runs/recent?limit=10').then(r => r.json()).then(d => {
+  const card = document.getElementById('runsCard');
+  const runs = d.runs || d || [];
+
+  if (!Array.isArray(runs) || runs.length === 0) {
+    card.innerHTML = '<div class="empty-runs"><div class="empty-icon">📡</div>暂无运行记录<br><span style="font-size:12px;margin-top:4px;display:block">通过 MCP 接入 Agent 后，运行记录将显示在这里</span></div>';
+    return;
+  }
+
+  document.getElementById('totalRuns').textContent = d.total || runs.length;
+  if (d.success_rate !== undefined) {
+    document.getElementById('successRate').textContent = d.success_rate + '%';
+  }
+
+  let html = '';
+  for (const run of runs) {
+    const statusClass = (run.status === 'completed' || run.status === 'success') ? 'completed'
+      : (run.status === 'running' || run.status === 'in_progress') ? 'running'
+      : run.status === 'failed' ? 'failed' : 'pending';
+    const statusLabel = { completed: '完成', success: '完成', running: '运行中', in_progress: '运行中', failed: '失败', pending: '等待' }[run.status] || run.status;
+    const task = run.user_task || run.task || run.run_id || '未知任务';
+    const taskDisplay = task.length > 50 ? task.substring(0, 50) + '...' : task;
+    const time = run.started_at || run.created_at || '';
+    const timeDisplay = time ? new Date(time).toLocaleString('zh-CN') : '';
+
+    html += '<a class="run-item" href="/observe/' + run.run_id + '">';
+    html += '  <div class="run-info">';
+    html += '    <div class="run-task">' + escapeHtml(taskDisplay) + '</div>';
+    html += '    <div class="run-meta">' + (run.run_id || '').substring(0, 12) + (timeDisplay ? ' | ' + timeDisplay : '') + '</div>';
+    html += '  </div>';
+    html += '  <div class="run-status ' + statusClass + '">' + statusLabel + '</div>';
+    html += '</a>';
+  }
+  card.innerHTML = html;
+}).catch(() => {
+  document.getElementById('runsCard').innerHTML = '<div class="empty-runs"><div class="empty-icon">⚠️</div>无法加载运行记录<br><span style="font-size:12px">请检查后端服务是否正常</span></div>';
+});
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>

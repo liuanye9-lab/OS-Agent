@@ -55,7 +55,7 @@ async function doLogin() {
   const email = document.getElementById('login-email').value, pass = document.getElementById('login-pass').value;
   try {
     const r = await fetch('/api/auth/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
-    if (r.ok) { const d = await r.json(); localStorage.setItem('saas_token', d.token); window.location.href='/dashboard/v3'; }
+    if (r.ok) { const d = await r.json(); localStorage.setItem('saas_token', d.token); window.location.href='/'; }
     else { document.getElementById('login-msg').innerHTML = '<span style="color:#ef4444;">邮箱或密码错误</span>'; }
   } catch(e) { document.getElementById('login-msg').innerHTML = '<span style="color:#ef4444;">网络错误</span>'; }
 }

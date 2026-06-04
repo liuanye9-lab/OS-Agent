@@ -20,6 +20,7 @@ Usage:
     python -m stable_agent.cli serve [--host 127.0.0.1] [--port 8000]
     python -m stable_agent.cli health [--json]
     python -m stable_agent.cli task run -t "任务内容" [--open-dashboard] [--json]
+    python -m stable_agent.cli task estimate -t "任务内容" [--json]
     python -m stable_agent.cli feedback remember --run-id ID --note "..." [--json]
     python -m stable_agent.cli feedback dont --run-id ID --note "..." [--json]
     python -m stable_agent.cli feedback correct --run-id ID --phrase "..." --meaning "..." [--json]
@@ -33,9 +34,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import socket
 import sys
 import webbrowser
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Default server config
@@ -342,6 +345,78 @@ def cmd_task_run(args: argparse.Namespace) -> None:
                 print(f"\n无法打开浏览器，请手动访问: {output['observer_url']}")
     if not output["ok"]:
         sys.exit(1)
+
+
+def cmd_task_estimate(args: argparse.Namespace) -> None:
+    """Estimate task risk without executing it (CLI Mode).
+
+    Returns a risk assessment in h-agent-v1 contract format.
+    """
+    task_input: str = args.task_input
+
+    # Risk assessment patterns
+    high_risk_patterns = [
+        r"rm\s+-rf", r"drop\s+table", r"\bdelete\b", r"force\s+push",
+        r"删除", r"清空", r"\bformat\b", r"sudo\s+rm",
+    ]
+    medium_risk_patterns = [
+        r"\bdeploy\b", r"\binstall\b", r"\bupdate\b", r"\bmodify\b",
+        r"修改", r"安装",
+    ]
+
+    input_lower = task_input.lower()
+    estimated_risk = "low"
+
+    # Check high risk patterns
+    for pattern in high_risk_patterns:
+        if re.search(pattern, input_lower):
+            estimated_risk = "high"
+            break
+
+    # Check medium risk patterns (only if not already high)
+    if estimated_risk != "high":
+        for pattern in medium_risk_patterns:
+            if re.search(pattern, input_lower):
+                estimated_risk = "medium"
+                break
+
+    requires_approval = estimated_risk in ("medium", "high")
+
+    # Generate estimated steps based on risk level
+    if estimated_risk == "high":
+        estimated_steps = ["parse_task", "risk_warning", "request_approval", "execute_with_rollback"]
+        suggestion = "高风险操作，建议人工审核后再执行。请确认操作范围和回滚方案。"
+    elif estimated_risk == "medium":
+        estimated_steps = ["parse_task", "confirm_scope", "execute"]
+        suggestion = "中等风险操作，建议确认操作范围后执行。"
+    else:
+        estimated_steps = ["parse_task", "execute"]
+        suggestion = "低风险操作，可以直接执行。"
+
+    # Rough token estimation based on input length and risk
+    base_tokens = len(task_input) * 2
+    if estimated_risk == "high":
+        estimated_tokens = base_tokens + 2000
+    elif estimated_risk == "medium":
+        estimated_tokens = base_tokens + 800
+    else:
+        estimated_tokens = base_tokens + 200
+
+    result = {
+        "ok": True,
+        "contract_version": "h-agent-v1",
+        "task_input": task_input,
+        "estimated_risk": estimated_risk,
+        "requires_approval": requires_approval,
+        "estimated_steps": estimated_steps,
+        "estimated_tokens": estimated_tokens,
+        "suggestion": suggestion,
+    }
+
+    if getattr(args, "json", False):
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        _print_summary(result)
 
 
 def cmd_serve(args: argparse.Namespace) -> None:
@@ -785,6 +860,13 @@ def cmd_integration_doctor(args: argparse.Namespace) -> None:
     # Summary
     checks["ok"] = all_ok
     checks["contract_version"] = "h-agent-v1"
+    checks["timestamp"] = datetime.now(timezone.utc).isoformat()
+    checks["h_agent_ready"] = all_ok
+    if all_ok:
+        checks["summary"] = "All integration checks passed. Environment is h-agent ready."
+    else:
+        failed = [k for k, v in checks.items() if isinstance(v, dict) and not v.get("ok", True)]
+        checks["summary"] = f"Integration checks failed: {', '.join(failed)}"
 
     if use_json:
         print(json.dumps(checks, ensure_ascii=False, indent=2))
@@ -901,6 +983,11 @@ def main() -> None:
     _add_server_flags(run_p)
     _add_json_flag(run_p)
     run_p.set_defaults(func=cmd_task_run)
+
+    estimate_p = task_sub.add_parser("estimate", help="任务风险评估（不执行）")
+    estimate_p.add_argument("--task-input", "-t", required=True, help="任务内容")
+    _add_json_flag(estimate_p)
+    estimate_p.set_defaults(func=cmd_task_estimate)
 
     # ---- feedback ----
     fb_parser = subparsers.add_parser("feedback", help="反馈管理")
