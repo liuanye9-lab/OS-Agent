@@ -78,6 +78,17 @@ class OSAgentHandler:
         if curator_report:
             data["curator_report"] = curator_report
 
+        # 5. 构建 Learning Impact Report (不影响主任务)
+        impact_report = ContractBuilder.build_learning_impact(
+            run_id=ctx.run_id,
+            events=trace.events,
+            token_report=trace.artifacts.get("token_report"),
+            si_report=trace.si_report,
+            curator_report=curator_report,
+        )
+        if impact_report:
+            data["learning_impact_report"] = impact_report
+
         return {
             "ok": result.ok,
             "data": data,

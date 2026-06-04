@@ -28,6 +28,9 @@ Usage:
     python -m stable_agent.cli effectiveness task create --task-id T01 --description "..." [--json]
     python -m stable_agent.cli effectiveness run record --task-id T01 --mode stableagent [--json]
     python -m stable_agent.cli dashboard open [--run-id ID] [--print-only]
+
+    # V12.1: Learning Impact Report
+    python -m stable_agent.cli impact show --run-id ID [--json]
 """
 
 from __future__ import annotations
@@ -906,6 +909,127 @@ def _add_json_flag(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--json", action="store_true", default=False, help="JSON 输出模式")
 
 
+def cmd_impact_show(args: argparse.Namespace) -> None:
+    """查看 Learning Impact Report。
+
+    优先从本地 RunStore 读取，如果没有则尝试 HTTP API。
+    """
+    run_id: str = args.run_id
+    use_json = getattr(args, "json", False)
+
+    # 尝试本地 RunStore
+    report = None
+    try:
+        from stable_agent.observation.run_store import RunStore
+        rs = RunStore()
+        events = rs.get_events(run_id)
+        if events:
+            # 从事件中提取 token_report 和 si_report
+            token_report = None
+            si_report = None
+            for evt in events:
+                if evt.get("event_type") == "token.budget.estimated" and evt.get("token_report"):
+                    token_report = evt["token_report"]
+                if evt.get("si_report"):
+                    si_report = evt["si_report"]
+                if evt.get("learning_triggered") is not None:
+                    si_report = si_report or {}
+                    si_report["learning_triggered"] = evt.get("learning_triggered")
+                    si_report["validation_passed"] = evt.get("validation_passed")
+                    si_report["skill_patches"] = evt.get("skill_patches", [])
+                    si_report["human_review_required"] = evt.get("human_review_required")
+                    si_report["best_skill_exported"] = evt.get("best_skill_exported", False)
+
+            from stable_agent.impact.builder import LearningImpactBuilder
+            builder = LearningImpactBuilder()
+            impact = builder.build(
+                run_id=run_id,
+                events=events,
+                token_report=token_report,
+                si_report=si_report,
+            )
+            report = impact.to_dict()
+    except Exception as exc:
+        if not use_json:
+            print(f"本地 RunStore 读取失败: {exc}")
+
+    # 如果本地没有，尝试 HTTP API
+    if report is None:
+        base = _base_url(args)
+        try:
+            report = _http_get(f"{base}/api/runs/{run_id}/impact", timeout=5.0)
+        except Exception as exc:
+            if use_json:
+                print(json.dumps({"ok": False, "error": f"无法获取 impact report: {exc}"}, ensure_ascii=False))
+            else:
+                print(f"无法获取 impact report: {exc}")
+                print("请确保 run_id 正确，或先运行: python -m stable_agent.cli serve")
+            sys.exit(1)
+
+    if use_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return
+
+    # 人类友好输出
+    print("=" * 50)
+    print("StableAgent Learning Impact Report")
+    print("=" * 50)
+    print()
+
+    overall = report.get("overall_impact_score", 0)
+    print(f"总体提升: {int(overall * 100)}%")
+    print(f"  记忆命中: {int(report.get('memory_impact_score', 0) * 100)}%")
+    print(f"  Token 节省: {int(report.get('token_impact_score', 0) * 100)}%")
+    print(f"  Skill 使用: {int(report.get('skill_impact_score', 0) * 100)}%")
+    print(f"  个性化提升: {int(report.get('personalization_score', 0) * 100)}%")
+    print()
+
+    memory_hits = report.get("memory_hits", [])
+    print(f"记忆命中: {len(memory_hits)} 条")
+    for m in memory_hits[:3]:
+        print(f"  - {m.get('content_preview', '')[:60]}")
+    print()
+
+    token = report.get("token_impact")
+    if token:
+        print(f"Token 节省: {token.get('saved_tokens_estimated', 0)} / {token.get('baseline_tokens_estimated', 0)}")
+    else:
+        print("Token 节省: 无数据")
+    print()
+
+    skills_used = report.get("skills_used", [])
+    candidates = report.get("skill_candidates_created", [])
+    print(f"Skill 使用: {len(skills_used)} 条")
+    print(f"新候选 Skill: {len(candidates)} 条")
+    for c in candidates[:3]:
+        status = "需要验证" if c.get("needs_validation") else "已验证"
+        print(f"  - {c.get('skill_id', '')} ({status})")
+    print()
+
+    improved = report.get("what_improved_zh", [])
+    not_improved = report.get("what_did_not_improve_zh", [])
+    if improved:
+        print("本次提升:")
+        for item in improved:
+            print(f"  + {item}")
+    if not_improved:
+        print("本次未提升:")
+        for item in not_improved:
+            print(f"  - {item}")
+    print()
+
+    next_actions = report.get("next_learning_actions_zh", [])
+    if next_actions:
+        print("下一步:")
+        for action in next_actions:
+            print(f"  → {action}")
+    print()
+
+    summary = report.get("user_visible_summary_zh", "")
+    if summary:
+        print(f"摘要: {summary}")
+
+
 def _add_server_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--host", default=DEFAULT_HOST, help=f"服务器地址 (默认: {DEFAULT_HOST})")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"服务器端口 (默认: {DEFAULT_PORT})")
@@ -1076,6 +1200,16 @@ def main() -> None:
     _add_server_flags(doctor_p)
     _add_json_flag(doctor_p)
     doctor_p.set_defaults(func=cmd_doctor)
+
+    # ---- V12.1: impact ----
+    impact_parser = subparsers.add_parser("impact", help="Learning Impact Report")
+    impact_sub = impact_parser.add_subparsers(dest="action")
+
+    impact_show_p = impact_sub.add_parser("show", help="查看学习提升报告")
+    impact_show_p.add_argument("--run-id", required=True, help="Run ID")
+    _add_server_flags(impact_show_p)
+    _add_json_flag(impact_show_p)
+    impact_show_p.set_defaults(func=cmd_impact_show)
 
     # ---- skill ----
     skill_parser = subparsers.add_parser("skill", help="技能管理")

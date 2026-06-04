@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from stable_agent.core.models import RunTrace, ToolRunResult
+from stable_agent.impact.builder import LearningImpactBuilder
 
 
 class ContractBuilder:
@@ -106,3 +107,38 @@ class ContractBuilder:
             "understanding_trace": result.understanding_trace,
             "token_report": result.token_report,
         }
+
+    @staticmethod
+    def build_learning_impact(
+        run_id: str,
+        events: list[dict[str, Any]],
+        token_report: dict[str, Any] | None = None,
+        si_report: dict[str, Any] | None = None,
+        curator_report: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """构建 Learning Impact Report。
+
+        构建失败不影响主任务，返回 None 或 error dict。
+
+        Args:
+            run_id: 运行标识。
+            events: 本次运行事件列表。
+            token_report: Token 预算报告。
+            si_report: Self-Improvement 报告。
+            curator_report: Curator 报告。
+
+        Returns:
+            LearningImpactReport 字典，或 None (构建失败时)。
+        """
+        try:
+            builder = LearningImpactBuilder()
+            report = builder.build(
+                run_id=run_id,
+                events=events,
+                token_report=token_report,
+                si_report=si_report,
+                curator_report=curator_report,
+            )
+            return report.to_dict()
+        except Exception as exc:
+            return {"error": f"Learning Impact Report 构建失败: {exc}"}

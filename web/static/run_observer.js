@@ -1050,6 +1050,322 @@ if (runId) {
 }
 
 // ==================================================================
+// V12.1: Learning Impact Report
+// ==================================================================
+
+/**
+ * Load Learning Impact Report from events API.
+ */
+async function loadImpactReport(runId) {
+  try {
+    const resp = await fetch(`/api/runs/${runId}/events`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const events = (data && Array.isArray(data.events)) ? data.events : (Array.isArray(data) ? data : []);
+    if (events.length === 0) return;
+
+    // Extract token_report and si_report from events
+    let tokenReport = null;
+    let siReport = null;
+    let curatorReport = null;
+    for (const evt of events) {
+      if (evt.event_type === "token.budget.estimated" && evt.token_report) {
+        tokenReport = evt.token_report;
+      }
+      if (evt.si_report) {
+        siReport = evt.si_report;
+      }
+      if (evt.learning_triggered !== undefined) {
+        siReport = siReport || {};
+        siReport.learning_triggered = evt.learning_triggered;
+        siReport.validation_passed = evt.validation_passed;
+        siReport.skill_patches = evt.skill_patches || [];
+        siReport.human_review_required = evt.human_review_required;
+        siReport.best_skill_exported = evt.best_skill_exported || false;
+      }
+    }
+
+    // Build impact report client-side (lightweight scoring)
+    const report = buildImpactReportClient(events, tokenReport, siReport, curatorReport);
+    if (report) {
+      renderImpactReport(report);
+    }
+  } catch (e) {
+    console.error("Impact report load failed:", e);
+  }
+}
+
+/**
+ * Client-side impact report builder (mirrors Python LearningImpactBuilder logic).
+ */
+function buildImpactReportClient(events, tokenReport, siReport, curatorReport) {
+  const report = {
+    run_id: runId || "",
+    overall_impact_score: 0,
+    memory_impact_score: 0,
+    token_impact_score: 0,
+    skill_impact_score: 0,
+    personalization_score: 0,
+    memory_hits: [],
+    token_impact: null,
+    skills_used: [],
+    skill_candidates_created: [],
+    what_improved_zh: [],
+    what_did_not_improve_zh: [],
+    next_learning_actions_zh: [],
+    user_visible_summary_zh: "",
+  };
+
+  // 1. Memory Impact
+  const memEvt = events.find(e => e.event_type === "temporal_memory.retrieved");
+  if (memEvt) {
+    const selected = memEvt.selected_memories || [];
+    const count = memEvt.count || selected.length;
+    if (count > 0) {
+      report.memory_hits = selected.slice(0, 5).map(m => ({
+        memory_id: m.memory_id || "",
+        content_preview: (m.reason_zh || "").slice(0, 80),
+        reason_zh: m.reason_zh || "相关性匹配",
+        used_in_stage: "temporal_memory_retrieving",
+        confidence: m.confidence || 0.7,
+      }));
+      report.memory_impact_score = Math.min(1.0, count / 5.0);
+      report.what_improved_zh.push(`本次命中 ${count} 条历史记忆，提升了任务个性化程度。`);
+    } else {
+      report.what_did_not_improve_zh.push("本次没有命中历史记忆，不会产生明显个性化提升。");
+    }
+  }
+
+  // 2. Token Impact
+  if (tokenReport && typeof tokenReport === "object") {
+    const saved = tokenReport.saved_tokens_estimated || 0;
+    const baseline = tokenReport.baseline_tokens_estimated || 0;
+    const ratio = tokenReport.saving_ratio || 0;
+    report.token_impact = {
+      baseline_tokens_estimated: baseline,
+      injected_tokens: tokenReport.injected_tokens || 0,
+      dropped_tokens: tokenReport.dropped_tokens || 0,
+      saved_tokens_estimated: saved,
+      saving_ratio: ratio,
+      summary_zh: tokenReport.summary_zh || "",
+      is_estimated: tokenReport.is_estimated !== false,
+    };
+    if (ratio > 0) {
+      report.token_impact_score = Math.min(0.8, ratio);
+      report.what_improved_zh.push(`本次通过上下文压缩节省了约 ${Math.round(ratio * 100)}% token。`);
+    } else if (baseline < 500) {
+      report.what_did_not_improve_zh.push("本次上下文较短，token 优化体感不明显。");
+    }
+  } else {
+    report.what_did_not_improve_zh.push("本次上下文较短或无 token 压缩数据，token 优化体感不明显。");
+  }
+
+  // 3. Skill Impact
+  let skillScore = 0;
+  if (curatorReport && curatorReport.candidates_created > 0) {
+    skillScore += 0.4;
+    for (let i = 0; i < curatorReport.candidates_created; i++) {
+      report.skill_candidates_created.push({
+        skill_id: `candidate_${i + 1}`,
+        status: "candidate",
+        reason_zh: "Curator 从本次运行中提炼出改进规则",
+        used: false,
+        generated_this_run: true,
+        needs_validation: true,
+        needs_human_review: false,
+      });
+    }
+    report.next_learning_actions_zh.push("已生成 candidate skill，需要后续相关任务验证。");
+  }
+  if (siReport && typeof siReport === "object") {
+    if (siReport.learning_triggered) skillScore += 0.2;
+    const patches = siReport.skill_patches || [];
+    if (patches.length > 0) {
+      skillScore += 0.2;
+      for (const p of patches) {
+        report.skill_candidates_created.push({
+          skill_id: p.patch_id || "",
+          status: "candidate",
+          reason_zh: `针对 ${p.failure_mode || "未知"} 模式生成的改进规则`,
+          used: false,
+          generated_this_run: true,
+          needs_validation: !siReport.validation_passed,
+          needs_human_review: !!siReport.human_review_required,
+        });
+      }
+    }
+    if (siReport.validation_passed) {
+      skillScore += 0.2;
+      report.what_improved_zh.push("Skill 验证通过，改进已确认有效。");
+    }
+    if (siReport.human_review_required) {
+      report.next_learning_actions_zh.push("有 skill patch 等待人工审核。");
+    }
+    if (siReport.best_skill_exported) {
+      skillScore += 0.1;
+      report.what_improved_zh.push("最佳 skill 已导出。");
+    }
+  }
+  report.skill_impact_score = Math.min(1.0, skillScore);
+  if (skillScore === 0) {
+    report.what_did_not_improve_zh.push("本次未使用 promoted skill，也未触发技能更新。");
+  }
+
+  // 4. Personalization
+  report.personalization_score = Math.round((0.4 * report.memory_impact_score + 0.3 * report.skill_impact_score + 0.3 * 0) * 10000) / 10000;
+
+  // 5. Overall
+  report.overall_impact_score = Math.round((0.25 * report.memory_impact_score + 0.25 * report.token_impact_score + 0.30 * report.skill_impact_score + 0.20 * report.personalization_score) * 10000) / 10000;
+
+  // 6. Low score honesty
+  if (report.overall_impact_score < 0.3) {
+    const lowReasons = [];
+    if (report.memory_impact_score < 0.2) lowReasons.push("历史记忆不足");
+    if (report.skill_impact_score < 0.2) lowReasons.push("未命中已验证 skill");
+    if (report.token_impact_score < 0.2) lowReasons.push("token 优化不明显");
+    if (lowReasons.length === 0) lowReasons.push("任务较简单或缺少用户反馈");
+    report.what_did_not_improve_zh.push(`本次个性化提升较弱，原因可能是：${lowReasons.join("、")}。`);
+  }
+
+  // 7. Summary
+  const pct = Math.round(report.overall_impact_score * 100);
+  const summaryParts = [`本次学习提升: ${pct}%`];
+  if (report.memory_hits.length > 0) summaryParts.push(`命中 ${report.memory_hits.length} 条记忆`);
+  if (report.token_impact && report.token_impact.saved_tokens_estimated > 0) summaryParts.push(`节省约 ${report.token_impact.saved_tokens_estimated} token`);
+  if (report.skill_candidates_created.length > 0) summaryParts.push(`生成 ${report.skill_candidates_created.length} 个候选 skill`);
+  if (report.overall_impact_score < 0.3) summaryParts.push("体感提升较弱，建议继续积累历史数据。");
+  report.user_visible_summary_zh = summaryParts.join(" | ");
+
+  return report;
+}
+
+/**
+ * Render Learning Impact Report into the dashboard panel.
+ */
+function renderImpactReport(report) {
+  const bar = document.getElementById("impactReportBar");
+  if (!bar) return;
+  bar.style.display = "block";
+
+  // Score cards
+  const scoreConfigs = [
+    { id: "impactOverall", value: report.overall_impact_score },
+    { id: "impactMemory", value: report.memory_impact_score },
+    { id: "impactToken", value: report.token_impact_score },
+    { id: "impactSkill", value: report.skill_impact_score },
+  ];
+  for (const cfg of scoreConfigs) {
+    const el = document.getElementById(cfg.id);
+    if (!el) continue;
+    const pct = Math.round(cfg.value * 100);
+    el.querySelector(".impact-score-value").textContent = `${pct}%`;
+    el.className = `impact-score-card ${pct >= 50 ? "high" : pct >= 20 ? "medium" : "low"}`;
+  }
+
+  // Memory hits
+  const memEl = document.getElementById("impactMemoryHits");
+  if (memEl) {
+    if (report.memory_hits.length === 0) {
+      memEl.innerHTML = '<div class="empty-state" style="padding:12px"><div class="empty-icon">🗂️</div>本次未命中历史记忆</div>';
+    } else {
+      let html = '<div class="impact-list">';
+      for (const m of report.memory_hits) {
+        html += `<li class="positive">${esc(m.content_preview || m.reason_zh)} <span style="color:var(--text-secondary);font-size:11px">(${Math.round(m.confidence * 100)}%)</span></li>`;
+      }
+      html += "</div>";
+      memEl.innerHTML = html;
+    }
+  }
+
+  // Token detail
+  const tokenEl = document.getElementById("impactTokenDetail");
+  if (tokenEl) {
+    if (!report.token_impact) {
+      tokenEl.innerHTML = '<div class="empty-state" style="padding:12px"><div class="empty-icon">📊</div>无 Token 数据</div>';
+    } else {
+      const t = report.token_impact;
+      const ratio = Math.round(t.saving_ratio * 100);
+      tokenEl.innerHTML = `
+        <div class="impact-item"><span class="impact-label">Baseline</span><span class="impact-value">${t.baseline_tokens_estimated} tokens</span></div>
+        <div class="impact-item"><span class="impact-label">Saved</span><span class="impact-value">${t.saved_tokens_estimated} tokens (${ratio}%)</span></div>
+        <div class="v11-bar"><div class="v11-bar-fill" style="width:${ratio}%;background:${ratio > 30 ? "#2e7d32" : ratio > 10 ? "#e65100" : "#86868b"}"></div></div>
+        ${t.summary_zh ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">${esc(t.summary_zh)}</div>` : ""}
+      `;
+    }
+  }
+
+  // Skill detail
+  const skillEl = document.getElementById("impactSkillDetail");
+  if (skillEl) {
+    const candidates = report.skill_candidates_created || [];
+    if (candidates.length === 0 && report.skills_used.length === 0) {
+      skillEl.innerHTML = '<div class="empty-state" style="padding:12px"><div class="empty-icon">🧬</div>本次未触发 Skill 更新</div>';
+    } else {
+      let html = "";
+      for (const s of report.skills_used) {
+        html += `<div class="impact-item"><span class="impact-label">${esc(s.skill_id)}</span><span class="v11-tag green">已使用</span></div>`;
+      }
+      for (const s of candidates) {
+        const tag = s.needs_validation ? '<span class="v11-tag orange">待验证</span>' : '<span class="v11-tag green">已验证</span>';
+        html += `<div class="impact-item"><span class="impact-label">${esc(s.skill_id)}</span>${tag}</div>`;
+      }
+      skillEl.innerHTML = html;
+    }
+  }
+
+  // Improved / Not improved
+  const improvedEl = document.getElementById("impactImproved");
+  if (improvedEl) {
+    const items = report.what_improved_zh || [];
+    if (items.length > 0) {
+      let html = '<ul class="impact-list">';
+      for (const item of items) html += `<li class="positive">${esc(item)}</li>`;
+      html += "</ul>";
+      improvedEl.innerHTML = html;
+    } else {
+      improvedEl.innerHTML = "";
+    }
+  }
+  const notImprovedEl = document.getElementById("impactNotImproved");
+  if (notImprovedEl) {
+    const items = report.what_did_not_improve_zh || [];
+    if (items.length > 0) {
+      let html = '<ul class="impact-list">';
+      for (const item of items) html += `<li class="negative">${esc(item)}</li>`;
+      html += "</ul>";
+      notImprovedEl.innerHTML = html;
+    } else {
+      notImprovedEl.innerHTML = "";
+    }
+  }
+
+  // Next actions
+  const nextEl = document.getElementById("impactNextActions");
+  if (nextEl) {
+    const items = report.next_learning_actions_zh || [];
+    if (items.length > 0) {
+      let html = '<ul class="impact-list">';
+      for (const item of items) html += `<li class="action">${esc(item)}</li>`;
+      html += "</ul>";
+      nextEl.innerHTML = html;
+    } else {
+      nextEl.innerHTML = '<div style="font-size:12px;color:var(--text-secondary)">暂无待执行的学习动作</div>';
+    }
+  }
+
+  // Summary
+  const summaryEl = document.getElementById("impactSummary");
+  if (summaryEl) {
+    summaryEl.textContent = report.user_visible_summary_zh || "";
+  }
+}
+
+// Load impact report after V11 panels
+if (runId) {
+  setTimeout(() => loadImpactReport(runId), 2000);
+}
+
+// ==================================================================
 // V11.3.1: Effectiveness Run Check — show badge if A/B data exists
 // ==================================================================
 

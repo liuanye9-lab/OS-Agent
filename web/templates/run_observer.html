@@ -531,6 +531,68 @@
   </div>
 </div>
 
+<!-- V12.1: Learning Impact Report -->
+<div class="bottom-bar" id="impactReportBar" style="display:none">
+  <div class="impact-report" id="impactReport">
+    <h3>📈 本次学习收益</h3>
+    <p class="v11-desc">StableAgent 记忆、Token、Skill 为本次任务带来的提升</p>
+
+    <!-- 总体分数 -->
+    <div class="impact-scores" id="impactScores">
+      <div class="impact-score-card" id="impactOverall">
+        <div class="impact-score-value">--</div>
+        <div class="impact-score-label">总体提升</div>
+      </div>
+      <div class="impact-score-card" id="impactMemory">
+        <div class="impact-score-value">--</div>
+        <div class="impact-score-label">记忆命中</div>
+      </div>
+      <div class="impact-score-card" id="impactToken">
+        <div class="impact-score-value">--</div>
+        <div class="impact-score-label">Token 节省</div>
+      </div>
+      <div class="impact-score-card" id="impactSkill">
+        <div class="impact-score-value">--</div>
+        <div class="impact-score-label">Skill 使用</div>
+      </div>
+    </div>
+
+    <!-- 记忆命中 -->
+    <div class="impact-section" id="impactMemorySection">
+      <div class="impact-section-title">记忆命中</div>
+      <div id="impactMemoryHits"><div class="empty-state"><div class="empty-icon">🗂️</div>暂无记忆命中</div></div>
+    </div>
+
+    <!-- Token 节省 -->
+    <div class="impact-section" id="impactTokenSection">
+      <div class="impact-section-title">Token 节省</div>
+      <div id="impactTokenDetail"><div class="empty-state"><div class="empty-icon">📊</div>暂无 Token 数据</div></div>
+    </div>
+
+    <!-- Skill 使用 / 生成 -->
+    <div class="impact-section" id="impactSkillSection">
+      <div class="impact-section-title">Skill 使用 / 生成</div>
+      <div id="impactSkillDetail"><div class="empty-state"><div class="empty-icon">🧬</div>暂无 Skill 数据</div></div>
+    </div>
+
+    <!-- 本次提升 / 未提升 -->
+    <div class="impact-section">
+      <div class="impact-section-title">本次分析</div>
+      <div id="impactImproved"></div>
+      <div id="impactNotImproved"></div>
+    </div>
+
+    <!-- 下一步 -->
+    <div class="impact-section" id="impactNextSection">
+      <div class="impact-section-title">下一步学习动作</div>
+      <div id="impactNextActions"></div>
+    </div>
+
+    <!-- 用户摘要 -->
+    <div id="impactSummary" style="margin-top:12px;font-size:13px;color:var(--text-secondary);font-weight:500"></div>
+  </div>
+</div>
+
 <!-- V11.1: Six Panels -->
 <div class="bottom-bar">
   <div class="v11-grid">
@@ -653,6 +715,51 @@
   }
 </style>
 
+<style>
+  /* V12.1: Learning Impact Report */
+  .impact-report {
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--card-radius);
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+  .impact-report h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .impact-scores {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+  @media (max-width: 700px) { .impact-scores { grid-template-columns: repeat(2, 1fr) } }
+  .impact-score-card {
+    background: var(--accent-light);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    transition: transform 0.2s;
+  }
+  .impact-score-card:hover { transform: translateY(-2px); }
+  .impact-score-card.low { background: #fff3e0; }
+  .impact-score-card.medium { background: #e8f0fe; }
+  .impact-score-card.high { background: #e8f5e9; }
+  .impact-score-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .impact-score-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+  .impact-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--glass-border); }
+  .impact-section-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .impact-item { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+  .impact-item .impact-label { color: var(--text-secondary); }
+  .impact-item .impact-value { font-weight: 500; }
+  .impact-list { list-style: none; padding: 0; margin: 0; }
+  .impact-list li { font-size: 13px; padding: 4px 0; line-height: 1.5; }
+  .impact-list li.positive::before { content: "+ "; color: #2e7d32; font-weight: 600; }
+  .impact-list li.negative::before { content: "- "; color: #bf360c; font-weight: 600; }
+  .impact-list li.action::before { content: "→ "; color: #0071e3; font-weight: 600; }
+</style>
 <script src="/static/avatar_scene.js"></script>
 <script src="/static/run_observer.js"></script>
 </body>
