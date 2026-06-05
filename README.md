@@ -1,37 +1,192 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/StableAgent-OS-111827?style=for-the-badge" alt="StableAgent OS">
-  <img src="https://img.shields.io/badge/MCP-55_tools-7c3aed?style=for-the-badge" alt="MCP Tools">
-  <img src="https://img.shields.io/badge/Closed_Loop-30%2F30-22c55e?style=for-the-badge" alt="Closed Loop">
-  <img src="https://img.shields.io/badge/Dashboard-Visualized-0ea5e9?style=for-the-badge" alt="Dashboard">
-  <img src="https://img.shields.io/badge/Agent_Capsule-Portable-f59e0b?style=for-the-badge" alt="Agent Capsule">
+  <img src="https://img.shields.io/badge/StableAgent-Harness_Alpha-111827?style=for-the-badge" alt="StableAgent Harness Alpha" />
+  <img src="https://img.shields.io/badge/CLI%20%2B%20MCP-Local_First-2563eb?style=for-the-badge" alt="CLI + MCP" />
+  <img src="https://img.shields.io/badge/Self_Evolution-Bounded_PR_Only-7c3aed?style=for-the-badge" alt="Bounded Self Evolution" />
+  <img src="https://img.shields.io/badge/Memory%20%2B%20Skill-Curation_Layer-16a34a?style=for-the-badge" alt="Memory and Skill" />
+  <img src="https://img.shields.io/badge/Human_in_the_Loop-Required-f97316?style=for-the-badge" alt="Human in the Loop" />
 </p>
 
 <h1 align="center">StableAgent OS</h1>
 
 <p align="center">
-  <strong>给 AI Coding Agent 配一套"外接大脑"</strong><br />
-  <sub>记住你的习惯 · 防止任务跑偏 · 记录失败经验 · 可视化每一次 Agent 思考</sub>
+  <strong>A personal Agent harness for AI Coding workflows.</strong><br />
+  <sub>Memory · Token Budget · Trace · Eval · Skill Curation · Validation Gate · Human Review</sub>
+</p>
+
+<p align="center">
+  <a href="#what-is-stableagent-os">Overview</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#self-evolution-loop">Self-Evolution Loop</a> ·
+  <a href="#current-status">Status</a> ·
+  <a href="#roadmap">Roadmap</a>
 </p>
 
 ---
 
-## V11.4 MCP + CLI Dual Gateway
+## What is StableAgent OS?
 
-V11.4 彻底打通 StableAgent 的 MCP 和 CLI 通道，提供三种可用入口：
+**StableAgent OS** is a local-first harness layer for AI Coding Agents such as Claude Code, Codex, Cursor, Trae, and other MCP-compatible tools.
 
-### 三种模式对比
+It is not another chat bot, and it does not fine-tune model weights.
 
-| 模式 | 是否需要 server | Claude Code 是否识别为工具 | 稳定性 | 适合场景 |
-|---|---|---|---|---|
-| HTTP MCP | 需要 | 是 | 中高 | 正式集成 |
-| stdio MCP | 不需要 | 是 | 高 | Claude Code 本地稳定集成 |
-| CLI | 不需要工具识别 | 否，通过 Bash | 最高 | fallback / 自动化 |
+It sits beside your coding agent and helps it work more consistently by managing:
 
-### 1. HTTP MCP Mode
+- user preferences and expression habits;
+- project memory and context selection;
+- token budget and compression guardrails;
+- task traces and execution events;
+- evaluation, bad cases, and regression evidence;
+- candidate skill patches and validation gates;
+- human review before long-term promotion.
 
-Claude Code / Codex / Trae 通过 `http://127.0.0.1:8000/mcp/` 连接 StableAgent。
+> The core idea: every Agent run should become a traceable, reviewable, testable, and reusable learning artifact.
 
-**配置**：
+---
+
+## Why this project exists
+
+AI Coding Agents are getting stronger, but long-running real projects still expose the same recurring problems:
+
+```text
+You ask: "Only fix this small bug. Do not rewrite unrelated modules."
+
+The Agent may still:
+1. edit too many files;
+2. forget your earlier constraints;
+3. miss project-specific context;
+4. repeat a previous mistake;
+5. compress away important memory;
+6. produce a confident answer without evidence;
+7. make it hard to tell what it is doing now.
+```
+
+StableAgent OS tries to solve this by adding a **bounded control layer** around the Agent:
+
+```mermaid
+flowchart LR
+    User[User] --> Host[Claude Code / Codex / Cursor]
+    Host --> SA[StableAgent OS]
+    SA --> Context[Context Budget]
+    SA --> Memory[Memory Router]
+    SA --> Trace[Trace Event Bus]
+    SA --> Eval[Eval + Bad Case]
+    SA --> Skill[SkillRepo + Curator]
+    SA --> Review[Human Review]
+    Review --> Skill
+    Skill --> SA
+```
+
+---
+
+## Product Positioning
+
+StableAgent OS is best understood as:
+
+```text
+AI Coding Agent
++ Personal Memory Layer
++ Workflow Observer
++ Evaluation Harness
++ Skill Curation System
++ Human Review Gate
+```
+
+It is designed for people who repeatedly use AI Coding Agents to iterate real projects and want the Agent to become more aligned with their personal workflow over time.
+
+### What it is
+
+| Layer | Role |
+|---|---|
+| Harness | Wraps Agent execution with trace, eval, memory, and safety gates |
+| Capsule | Stores user preferences, project memory, bad cases, skills, and eval history |
+| Observer | Shows what the Agent is doing, why, and what happened |
+| Curator | Converts feedback and failures into candidate skills |
+| Validation Gate | Proves whether a new skill actually improves future tasks |
+
+### What it is not
+
+| Not this | Why |
+|---|---|
+| A fine-tuned model | It does not train model weights |
+| A fully autonomous self-modifying system | Human review remains required |
+| A generic chatbot | It is built around coding-agent workflows |
+| A dashboard-only demo | The goal is validated learning, not just visualization |
+| A magic memory store | Memory must be retrieved, evaluated, and proven useful |
+
+---
+
+## Quick Start
+
+### 1. Clone
+
+```bash
+git clone https://github.com/liuanye9-lab/OS-Agent.git
+cd OS-Agent
+```
+
+### 2. Install
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -e .[dev]
+```
+
+If your shell does not support extras, use:
+
+```bash
+python -m pip install -e .
+python -m pip install pytest pytest-asyncio ruff
+```
+
+### 3. Run local server
+
+```bash
+PYTHONPATH=. .venv/bin/python -m stable_agent.cli serve
+```
+
+Open:
+
+```text
+API Docs:    http://127.0.0.1:8000/docs
+MCP:         http://127.0.0.1:8000/mcp/
+Dashboard:   http://127.0.0.1:8000
+Connect:     http://127.0.0.1:8000/connect
+```
+
+### 4. Run a task from CLI
+
+```bash
+PYTHONPATH=. .venv/bin/python -m stable_agent.cli task run \
+  --task-input "Test StableAgent normal path: task intake, memory retrieval, context guard, eval, trace, and dashboard replay." \
+  --open-dashboard \
+  --json
+```
+
+### 5. Test MCP tools/list
+
+```bash
+curl -X POST http://127.0.0.1:8000/mcp/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "tools-list",
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+---
+
+## Claude Code / MCP Setup
+
+StableAgent supports both HTTP MCP and stdio MCP.
+
+### HTTP MCP
+
+Use this when the server is already running:
 
 ```json
 {
@@ -45,699 +200,449 @@ Claude Code / Codex / Trae 通过 `http://127.0.0.1:8000/mcp/` 连接 StableAgen
 }
 ```
 
-**启动服务**：
+### stdio MCP
 
-```bash
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli serve
-```
-
-### 2. Native CLI Mode
-
-任何 Coding 软件都可以通过命令行调用：
-
-```bash
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli task run \
-  --task-input "任务描述" \
-  --open-dashboard \
-  --json
-```
-
-### 3. Stdio MCP Mode
-
-把 CLI 包装成一个 stdio MCP server，让 Claude Code 可以通过本地命令方式加载 StableAgent，不依赖 HTTP 服务：
-
-```json
-{
-  "mcpServers": {
-    "stableagent-stdio": {
-      "type": "stdio",
-      "command": "/Users/Zhuanz/OS-Agent/OS-Agent/.venv/bin/python",
-      "args": ["-m", "stable_agent.mcp_stdio"],
-      "env": {
-        "PYTHONPATH": "/Users/Zhuanz/OS-Agent/OS-Agent"
-      }
-    }
-  }
-}
-```
-
-**详细配置指南**：[docs/CLAUDE_CODE_MCP_SETUP.md](docs/CLAUDE_CODE_MCP_SETUP.md)
-
----
-
-## 这个项目一句话是什么？
-
-**StableAgent OS 是一个接在 Claude Code / Codex / Trae / Cursor 这类 AI Coding 工具旁边的“个人 Agent 操作系统”。**
-
-它不训练模型权重，也不是另一个聊天机器人。它做的是：
-
-> 把你的表达习惯、项目上下文、失败经验、评测标准、Token 预算和 Dashboard 轨迹，打包成一套可迁移的 **Agent Capsule**，让不同 AI 工具更稳定地理解你。
-
-可以把它想成：
-
-| 类比 | StableAgent OS 是什么 |
-|---|---|
-| 学生 | 大模型本身，例如 Claude / GPT / Qwen / DeepSeek |
-| 老师 | 你对模型的反馈和纠正 |
-| 错题本 | Bad Case Bank，记录模型犯过的错 |
-| 学习计划 | Skill Patch，把失败经验变成可复用规则 |
-| 书包/U 盘 | Agent Capsule，打包你的记忆、规则、习惯和评测标准 |
-| 仪表盘 | Dashboard，把 Agent 每一步理解、压缩、判断、学习过程可视化 |
-
----
-
-## 为什么需要 StableAgent OS？
-
-AI Coding 工具越来越强，但长任务里经常出现这些问题：
-
-```text
-你说：只修这个小 bug，不要大范围重构。
-
-AI 可能会：
-1. 改了 12 个无关文件；
-2. 忘了你刚刚强调的约束；
-3. 生成看似正确但无法运行的代码；
-4. 同一个错误下次继续犯；
-5. 解释得很自信，但你不知道它到底怎么理解任务；
-6. token 越堆越多，最后上下文又乱又贵。
-```
-
-StableAgent OS 想解决的是：
-
-> **不是让模型“变聪明”，而是给模型外面装一层能记忆、能复盘、能约束、能可视化的使用层。**
-
----
-
-## 核心比喻：给每个模型学生配一套“学习装备”
-
-不同大模型就像不同学生：
-
-- 有些写代码强，但容易过度修改；
-- 有些推理强，但工具调用慢；
-- 有些文案自然，但工程稳定性弱；
-- 有些便宜好用，但上下文保护差。
-
-StableAgent OS 不去改学生的大脑，而是给学生配装备：
-
-```mermaid
-flowchart LR
-    A[不同大模型学生<br/>Claude / GPT / Qwen / DeepSeek] --> B[StableAgent OS 外接装备]
-    B --> C[记住你的表达习惯]
-    B --> D[保护任务关键约束]
-    B --> E[记录失败错题]
-    B --> F[生成 Skill Patch]
-    B --> G[Token 预算和压缩]
-    B --> H[Dashboard 可视化]
-    C --> I[更懂你]
-    D --> I
-    E --> I
-    F --> I
-    G --> I
-    H --> I
-```
-
-换句话说：
-
-> 模型能力会不断迭代，但你的个人使用层也应该能成长。StableAgent OS 就是这套可迁移的个人使用层。
-
----
-
-## 项目目标
-
-StableAgent OS 的目标不是做一个“更大的 Agent”，而是做一个 **AI Coding 用户的个人稳定层**。
-
-它要做到：
-
-1. **不跑偏**：任务开始前先理解你的真实意图；
-2. **不失忆**：把长期偏好、项目记忆、表达习惯存在 Agent Capsule 里；
-3. **不重复犯错**：把 bad case 转成 regression case 和 skill patch；
-4. **不瞎压缩上下文**：Token 预算时保护关键约束；
-5. **不黑箱执行**：Dashboard 展示每一步发生了什么；
-6. **不只靠感觉证明有用**：Effectiveness Dashboard 用 A/B 数据验证是否真的更稳。
-
----
-
-## 整体架构
-
-```mermaid
-flowchart TB
-    User[用户 / AI Coding 重度用户] --> Client[Claude Code / Codex / Trae / Cursor]
-    Client --> MCP[MCP Gateway<br/>55 tools]
-    MCP --> OSAgent[stableagent.task.os_agent]
-
-    OSAgent --> U[Understanding Trace<br/>语义理解轨迹]
-    OSAgent --> C[Context Guard<br/>上下文保护]
-    OSAgent --> T[Token Budget<br/>Token 预算]
-    OSAgent --> M[Agent Capsule<br/>个人记忆胶囊]
-    OSAgent --> E[Evaluation<br/>评测与失败归因]
-    OSAgent --> S[Skill Evolution<br/>规则进化]
-
-    U --> Dash[Dashboard Observer]
-    C --> Dash
-    T --> Dash
-    M --> Dash
-    E --> Dash
-    S --> Dash
-
-    Dash --> Human[用户人工确认 / 纠正 / 审批]
-    Human --> Capsule[长期记忆与规则沉淀]
-    Capsule --> OSAgent
-```
-
----
-
-## Agent Capsule：像 U 盘一样带走你的 AI 使用习惯
-
-StableAgent OS 的核心不是一次任务，而是长期积累的 **Agent Capsule**。
-
-它可以理解为：
-
-```text
-.stableagent-capsule/
-├── profile/              # 你的表达习惯，比如“不要AI味”是什么意思
-├── memory/               # 长期记忆、项目记忆、偏好记忆
-├── skills/               # 经过验证的工作规则
-├── bad_cases/            # 模型犯过的错
-├── evals/                # 个人评测样例和回归测试
-├── token_ledger/         # Token 使用和节省记录
-├── model_profiles/       # 不同模型的能力画像
-└── effectiveness/        # 项目有效性 A/B 数据
-```
-
-它的目标是：
-
-> 不管你今天用 Claude Code，明天用 Codex，后天换 Trae，你的习惯、错题本、评测标准和任务边界都可以继续迁移。
-
----
-
-## 一次任务在 StableAgent 里如何流动？
-
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant C as Coding Agent
-    participant S as StableAgent OS
-    participant D as Dashboard
-    participant P as Agent Capsule
-
-    U->>C: 继续优化这个项目，不要AI味，不要大范围重构
-    C->>S: 调用 stableagent.task.os_agent
-    S->>S: 生成 Understanding Trace
-    S->>P: 读取表达习惯与项目记忆
-    S->>S: 保护关键约束，压缩上下文
-    S->>S: 生成 Token Report
-    S->>D: 写入事件流和可视化面板
-    D-->>U: 展示理解轨迹、Token预算、记忆、bad case
-    U->>D: 纠正 / 记住 / 下次别这样
-    D->>P: 写入表达习惯、bad case、skill patch
-```
-
----
-
-## V11 Dashboard：让 Agent 的“脑内过程”可视化
-
-Dashboard 不是普通日志页面，它更像是 Agent 的监控仪表盘。
-
-它会展示：
-
-| 面板 | 作用 |
-|---|---|
-| Run Trace / 事件时间线 | 这次任务从接收到完成经历了哪些步骤 |
-| Understanding Panel | 系统如何理解你的原话，有哪些假设和不确定点 |
-| Token Budget | 原本要塞多少上下文，实际保留多少，节省多少 |
-| Memory Map | 这次任务用了哪些长期记忆和表达习惯 |
-| Bad Case Bank | 出现了哪些失败案例，是否生成回归测试 |
-| Skill Evolution | 是否生成新的 Skill Patch，是否进入验证/人工审核 |
-| Memory Health | 哪些记忆该保留、合并、删除或人工审核 |
-
-```mermaid
-flowchart LR
-    A[任务输入] --> B[理解轨迹]
-    B --> C[上下文保护]
-    C --> D[Token 预算]
-    D --> E[执行与评测]
-    E --> F[Bad Case]
-    F --> G[Skill Patch]
-    G --> H[Human Review]
-    A --> UI[Dashboard 可视化]
-    B --> UI
-    C --> UI
-    D --> UI
-    E --> UI
-    F --> UI
-    G --> UI
-```
-
----
-
-## 反馈闭环：把“下次别这样”变成可验证规则
-
-传统 AI 工具里，你说一句“下次别这样”，模型可能下一轮就忘了。
-
-StableAgent OS 会把这句话变成结构化闭环：
-
-```mermaid
-flowchart TB
-    A[用户反馈：下次别这样] --> B[BadCaseRecord<br/>记录失败案例]
-    B --> C[PersonalEvalCase<br/>生成个人评测样例]
-    C --> D[SkillPatchCandidate<br/>提出规则补丁]
-    D --> E[RegressionValidationRunner<br/>回归验证]
-    E -->|通过| F[HumanReviewQueue<br/>进入人工审核]
-    E -->|失败| G[拒绝进入长期规则]
-    F --> H[人工确认]
-    H --> I[长期 Skill / 记忆沉淀]
-```
-
-关键原则：
-
-> 失败经验不能直接污染长期规则，必须经过验证和人工审核。
-
----
-
-## 表达习惯学习：让模型理解你的“人话”
-
-比如你说：
-
-```text
-不要AI味。
-```
-
-模型可能不知道你具体指什么。
-
-StableAgent 可以把它记录成：
-
-```json
-{
-  "phrase": "不要AI味",
-  "normalized_meaning": [
-    "避免模板化表达",
-    "保持克制",
-    "减少空泛营销腔"
-  ],
-  "scope": "global",
-  "confidence": 0.7
-}
-```
-
-之后你再说：
-
-```text
-这个 README 不要AI味，写得自然一点。
-```
-
-StableAgent 会在 Understanding Trace 里命中这个表达习惯，让 Coding Agent 少猜一步。
-
----
-
-## Effectiveness Dashboard：不靠感觉，靠数据证明项目有没有用
-
-工程闭环成立，不等于产品有效。
-
-StableAgent OS 新增了 Effectiveness Dashboard，用来做 A/B 对比：
-
-```mermaid
-flowchart LR
-    T[同一类任务] --> A[Baseline<br/>直接用 Coding Agent]
-    T --> B[StableAgent Mode<br/>先调用 os_agent]
-
-    A --> M[记录指标]
-    B --> M
-
-    M --> R[Effectiveness Dashboard]
-    R --> V{是否真的有效？}
-
-    V -->|跑偏更少| YES[有效性增强]
-    V -->|返工更少| YES
-    V -->|约束保留更好| YES
-    V -->|没有改善| NO[继续优化系统]
-```
-
-它关注这些指标：
-
-| 指标 | 解释 | 希望变化 |
-|---|---|---|
-| success_rate | 任务是否完成 | 上升 |
-| test_pass_rate | 测试是否通过 | 上升 |
-| intent_drift_rate | 是否跑偏 | 下降 |
-| over_editing_rate | 是否过度修改 | 下降 |
-| constraint_preservation_rate | 是否保留约束 | 上升 |
-| bad_case_recurrence_rate | 同类错误是否复发 | 下降 |
-| avg_rework_count | 平均返工次数 | 下降 |
-| avg_estimated_tokens | Token 消耗 | 下降或不明显上升 |
-| avg_user_satisfaction | 用户满意度 | 上升 |
-
----
-
-## 默认调用规则：AGENTS.md / CLAUDE.md
-
-项目已经加入默认规则文件：
-
-```text
-AGENTS.md
-CLAUDE.md
-```
-
-目标是让 Coding Agent 打开本仓库时默认知道：
-
-> 非平凡编码任务开始前，先调用 `stableagent.task.os_agent`，生成 run_id 和 Dashboard，再继续执行。
-
-典型调用：
-
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "stableagent.task.os_agent",
-    "arguments": {
-      "task_input": "继续优化这个项目，不要AI味，不要大范围重构无关文件",
-      "open_dashboard": true
-    }
-  }
-}
-```
-
----
-
-## 快速开始
-
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/liuanye9-lab/OS-Agent.git
-cd OS-Agent
-```
-
-### 2. 使用 Python 3.11+
-
-macOS 示例：
-
-```bash
-brew install python@3.11
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-### 3. 启动服务
-
-```bash
-# 推荐使用 CLI 启动
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli serve
-
-# 或直接使用 uvicorn
-# PYTHONPATH=. uvicorn web.server:app --host 127.0.0.1 --port 8000
-```
-
-启动成功后访问：
-
-```text
-http://127.0.0.1:8000/api/health
-```
-
-预期：
-
-```json
-{
-  "ok": true,
-  "service": "StableAgent OS"
-}
-```
-
-### 4. 健康检查（V11.4）
-
-```bash
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli health --json
-```
-
-### 5. 执行任务（V11.4 CLI Mode）
-
-```bash
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli task run \
-  --task-input "你的任务描述" \
-  --open-dashboard \
-  --json
-```
-
----
-
-## MCP 接入配置
-
-推荐配置：
+Use this for local Claude Code integration:
 
 ```json
 {
   "mcpServers": {
     "stableagent": {
-      "type": "streamableHttp",
-      "url": "http://127.0.0.1:8000/mcp/",
-      "timeout": 60000
+      "type": "stdio",
+      "command": "/ABSOLUTE_PATH/OS-Agent/.venv/bin/python",
+      "args": ["-m", "stable_agent.mcp_stdio", "--profile", "minimal"],
+      "env": {
+        "PYTHONPATH": "/ABSOLUTE_PATH/OS-Agent",
+        "STABLE_AGENT_TOOL_PROFILE": "minimal",
+        "STABLE_AGENT_RUNTIME_MODE": "local"
+      }
     }
   }
 }
 ```
 
-调试工具列表：
-
-```bash
-curl http://127.0.0.1:8000/mcp/tools
-```
-
-调用主工具：
-
-```bash
-curl -s -X POST http://127.0.0.1:8000/mcp/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "stableagent.task.os_agent",
-      "arguments": {
-        "task_input": "继续优化这个项目，不要AI味，不要大范围重构无关文件",
-        "open_dashboard": true
-      }
-    },
-    "id": 1
-  }'
-```
+Detailed guide: [docs/CLAUDE_CODE_MCP_SETUP.md](docs/CLAUDE_CODE_MCP_SETUP.md)
 
 ---
 
-## 常用页面
-
-| 页面 | 地址 |
-|---|---|
-| 健康检查 | `http://127.0.0.1:8000/api/health` |
-| MCP 工具列表 | `http://127.0.0.1:8000/mcp/tools` |
-| Run Observer | `http://127.0.0.1:8000/observe/{run_id}?check=1` |
-| Run Detail | `http://127.0.0.1:8000/runs/{run_id}` |
-| Effectiveness Dashboard | `http://127.0.0.1:8000/effectiveness` |
-| API Docs | `http://127.0.0.1:8000/docs` |
-
----
-
-## CLI Mode：稳定保底入口（V11.4）
-
-MCP 是推荐集成方式，但不同 Coding 软件对 MCP 的支持不稳定（Trae / Codex / Claude Code 可能因配置路径、streamableHttp、SSE、JSON-RPC 兼容问题导致工具列表无法加载）。
-
-**CLI Mode 是稳定保底入口**，所有 Coding 软件都可以通过 shell 命令调用 StableAgent。
-
-### 启动服务（推荐用 CLI）
-
-```bash
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli serve
-```
-
-### 健康检查
-
-```bash
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli health --json
-```
-
-### 执行任务
-
-```bash
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli task run \
-  --task-input "继续优化这个项目，不要AI味，不要大范围重构无关文件" \
-  --open-dashboard \
-  --json
-```
-
-### 反馈命令
-
-```bash
-# 记住这个
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli feedback remember \
-  --run-id run_xxx --note "以后记住这个约束" --json
-
-# 下次别这样
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli feedback dont \
-  --run-id run_xxx --note "下次不要大范围重构无关文件" --json
-
-# 纠正表达习惯
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli feedback correct \
-  --run-id run_xxx \
-  --phrase "不要AI味" \
-  --meaning "避免模板化表达，保持克制，减少空泛营销腔" \
-  --json
-```
-
-### 效果评估
-
-```bash
-PYTHONPATH=. .venv/bin/python -m stable_agent.cli effectiveness summary --json
-```
-
-### MCP Mode vs CLI Mode
-
-| 特性 | MCP Mode | CLI Mode |
-|------|----------|----------|
-| 集成方式 | Claude Code / Codex / Trae 直接识别为工具 | 所有 Coding 软件通过 shell 命令调用 |
-| 稳定性 | 依赖 MCP 配置兼容性 | 稳定保底入口 |
-| 输出格式 | JSON-RPC 2.0 | `--json` 模式输出 JSON |
-| 推荐场景 | MCP 正常工作时 | MCP 识别失败时作为 fallback |
-| Dashboard | 自动展示 | 通过 Web 服务展示 |
-
----
-
-## 当前能力状态
-
-| 能力 | 状态 |
-|---|---|
-| MCP Gateway | 已支持 JSON-RPC / tools / health / SSE |
-| CLI Mode (V11.4) | 已支持 task run / serve / health / feedback / effectiveness / dashboard |
-| stdio MCP Server (V11.4) | 已支持 initialize / tools/list / tools/call |
-| stableagent.task.os_agent | 已接入主流程 |
-| Understanding Trace | 已支持 |
-| Expression Profile | 已支持 |
-| Token Budget Ledger | 已支持 |
-| FeedbackLearningService | 已支持 |
-| Bad Case → Eval Case → Skill Patch | 已支持 |
-| Validation → Human Review | 已支持 |
-| Dashboard 六大面板 | 已支持 |
-| AGENTS.md / CLAUDE.md | 已支持（含 MCP/CLI 优先级规则） |
-| Effectiveness Dashboard | MVP 已支持，仍需真实 A/B 数据积累 |
-
----
-
-## 项目不是在做什么？
-
-StableAgent OS **不是**：
-
-- 不是微调模型；
-- 不是训练新的基础大模型；
-- 不是另一个聊天壳；
-- 不是普通 prompt 模板库；
-- 不是只做日志记录。
-
-它真正做的是：
-
-> 把 AI Coding 的使用过程变成一个可记忆、可评测、可纠正、可迁移、可视化的系统。
-
----
-
-## 适合谁使用？
-
-适合：
-
-- 高频使用 Claude Code / Codex / Trae / Cursor 的开发者；
-- 经常遇到 AI 长任务跑偏的人；
-- 想把个人提示词、项目习惯、失败经验沉淀下来的人；
-- 想验证 AI Coding 是否真的提升效率的人；
-- 想做 Agent / MCP / AI Workflow 产品的人。
-
-不适合：
-
-- 只想一次性问答的人；
-- 不需要长期项目记忆的人；
-- 不关心可视化、评测和复盘的人。
-
----
-
-## 项目路线图
+## Architecture
 
 ```mermaid
 flowchart TB
-    V10[V10<br/>事件链和 Dashboard 打通] --> V11[V11<br/>Agent Capsule]
-    V11 --> V112[V11.2<br/>Trustworthy Feedback Loop]
-    V112 --> V113[V11.3<br/>Default Agent Rules + Effectiveness MVP]
-    V113 --> V1131[V11.3.1<br/>Effectiveness Hardening]
-    V1131 --> V114[V11.4<br/>MCP + CLI Dual Gateway]
-    V114 --> V12[V12<br/>多工具稳定接入与真实数据评测]
+    Host[Claude Code / Codex / Cursor / Other MCP Host]
+
+    subgraph Gateway[Gateway Layer]
+      CLI[CLI]
+      HTTP[HTTP MCP]
+      STDIO[stdio MCP]
+      Profile[Tool Profile Router]
+    end
+
+    subgraph Runtime[Runtime Layer]
+      Local[LocalRuntime]
+      Server[FastAPI Server]
+      Store[RunStore / EventStore]
+    end
+
+    subgraph Workflow[Agent Workflow]
+      Intake[Task Intake]
+      Intent[Intent Parser]
+      Context[Context Budget Manager]
+      Memory[Temporal Memory Router]
+      Skill[Skill Retriever]
+      Execute[Executor]
+      Eval[Evaluator]
+      Curator[Skill Curator]
+      Gate[Validation Gate]
+      Review[Human Review]
+    end
+
+    subgraph Knowledge[Knowledge Layer]
+      Capsule[Agent Capsule]
+      SkillRepo[SkillRepo]
+      BadCase[Bad Case Bank]
+      External[External Research Index]
+    end
+
+    subgraph Observer[Observer Layer]
+      Trace[Trace Event Bus]
+      Dashboard[Dashboard]
+      Impact[Learning Impact Report]
+    end
+
+    Host --> CLI
+    Host --> HTTP
+    Host --> STDIO
+    CLI --> Profile
+    HTTP --> Profile
+    STDIO --> Profile
+    Profile --> Local
+    Profile --> Server
+    Local --> Workflow
+    Server --> Workflow
+    Workflow --> Store
+    Store --> Trace
+    Trace --> Dashboard
+    Trace --> Impact
+    Workflow --> Capsule
+    Workflow --> SkillRepo
+    Workflow --> BadCase
+    Curator --> SkillRepo
+    Gate --> Review
+    External --> Curator
 ```
-
-### 下一步重点
-
-- [ ] 修正 Effectiveness schema，加入 `test_passed / rework_count / user_satisfaction` 等完整指标；
-- [ ] 将 Effectiveness 数据默认写入 `.stableagent-capsule/effectiveness/`；
-- [ ] 统一 `/api/effectiveness/*` 返回结构；
-- [ ] Run Observer 增加“记录到 Effectiveness”；
-- [ ] 积累至少 10 个真实 A/B 任务数据；
-- [ ] 输出一份真实效果报告。
 
 ---
 
-## 最小有效性实验
+## Core Workflow
 
-想证明 StableAgent 是否真的有用，不要靠感觉，跑 10 个任务：
+Each run should follow a traceable workflow:
 
-```text
-同类任务 A：直接用 Coding Agent 做。
-同类任务 B：先调用 StableAgent，再让 Coding Agent 做。
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant H as Coding Agent Host
+    participant S as StableAgent
+    participant M as Memory / SkillRepo
+    participant E as Eval / Validation
+    participant D as Dashboard
+    participant R as Human Review
+
+    U->>H: Submit coding task
+    H->>S: Call stableagent.task.os_agent
+    S->>S: Parse task intent
+    S->>M: Retrieve memory and promoted skills
+    S->>S: Build context with token budget
+    S->>S: Execute workflow
+    S->>E: Evaluate result and trace
+    S->>D: Emit events and progress
+    E->>S: Identify failure or improvement opportunity
+    S->>M: Create candidate skill if needed
+    M->>E: Run validation gate
+    E->>R: Request review for risky promotion
+    R->>M: Approve / reject / keep candidate
+    S->>U: Return report and dashboard URL
 ```
-
-记录：
-
-```json
-{
-  "task_id": "T01",
-  "mode": "baseline | stableagent",
-  "success": true,
-  "test_passed": true,
-  "intent_drift": false,
-  "over_editing": false,
-  "constraint_preserved": true,
-  "rework_count": 1,
-  "estimated_tokens": 12000,
-  "user_satisfaction": 4
-}
-```
-
-如果 StableAgent 组出现：
-
-```text
-跑偏率下降
-返工次数下降
-约束保留率上升
-bad case 复发率下降
-测试通过率不下降
-```
-
-才说明它真的有效。
 
 ---
 
-## 项目背后的核心思想
+## Self-Evolution Loop
 
-StableAgent OS 的底层判断是：
+StableAgent uses a **bounded self-evolution loop**.
 
-> 未来的大模型会越来越强，但每个人真正需要的是“适配自己”的外部使用层。
+It does not automatically overwrite long-term skills. It should only promote a skill after evidence exists.
 
-模型像发动机，StableAgent 像仪表盘、导航、刹车、错题本和驾驶习惯记录器。
+```mermaid
+flowchart LR
+    Task[Task Run] --> Trace[Trace + Events]
+    Trace --> Eval[Eval Report]
+    Eval --> Failure[Failure Attribution]
+    Failure --> Candidate[Candidate Skill]
+    Candidate --> Validation[Delayed Validation]
+    Validation --> Decision{Improves related tasks?}
+    Decision -->|No| Reject[Reject / Keep Candidate]
+    Decision -->|Yes| Review[Human Review]
+    Review -->|Reject| Reject
+    Review -->|Approve| Promote[Promoted Skill]
+    Promote --> SkillRepo[SkillRepo]
+    SkillRepo --> NextRun[Future Runs]
+```
 
-发动机升级当然重要，但如果没有稳定的驾驶系统，长任务依然会跑偏。
+### Promotion rule
 
-StableAgent OS 想做的就是这套系统。
+A candidate skill should not become a promoted skill unless it satisfies evidence gates such as:
+
+```text
+schema_valid = true
+validations >= 2
+score_delta >= +0.03
+regression_count = 0
+event_completeness = 1.0
+token_delta <= +0.10
+high_risk_requires_human_review = true
+```
+
+---
+
+## Agent Capsule
+
+The Agent Capsule is the portable personal layer around your AI Coding workflow.
+
+```text
+.stableagent-capsule/
+├── profile/              # user expression habits and preferences
+├── memory/               # long-term memory and project memory
+├── skills/               # validated and promoted skills
+├── candidates/           # candidate skills waiting for validation
+├── bad_cases/            # failure cases and regression examples
+├── evals/                # evaluation cases and validation records
+├── token_ledger/         # token budget and compression reports
+├── model_profiles/       # model-specific strengths and weaknesses
+└── effectiveness/        # impact reports and A/B evidence
+```
+
+The goal is simple:
+
+> Your AI tools may change, but your preferences, mistakes, rules, and evaluation standards should remain portable.
+
+---
+
+## Visual Task Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Received
+    Received --> Parsed: task.received
+    Parsed --> ContextBuilt: intent.parsed + context.built
+    ContextBuilt --> Running: workflow.step.started
+    Running --> Evaluated: workflow.step.completed
+    Evaluated --> LearningCheck: eval.completed
+    LearningCheck --> Candidate: learning-worthy
+    LearningCheck --> Completed: no learning needed
+    Candidate --> Validation: skill.patch.proposed
+    Validation --> Review: high risk or promotion needed
+    Validation --> Completed: rejected or kept candidate
+    Review --> Completed: approved / rejected
+    Completed --> [*]
+```
+
+---
+
+## Dashboard Observer
+
+The dashboard should help users understand the Agent instead of only showing logs.
+
+It should answer:
+
+```text
+What is the Agent doing now?
+Why did it choose this step?
+Which memory or skill did it use?
+How much context did it keep or drop?
+Did the result pass evaluation?
+Did this run create a candidate skill?
+Does a human need to approve anything?
+```
+
+Recommended observer layout:
+
+```mermaid
+flowchart TB
+    A[Header: task / run_id / profile / status] --> B[Workflow Node Timeline]
+    A --> C[Current Node Explanation]
+    A --> D[Memory + Skill Hits]
+    C --> E[Eval Score + Risks]
+    D --> F[Candidate Skill / Validation]
+    E --> G[Learning Impact Report]
+    F --> G
+```
+
+---
+
+## External Research Harness
+
+StableAgent is evolving toward a research-aware harness:
+
+```mermaid
+flowchart LR
+    GitHub[GitHub Repos / Releases] --> Crawler[ExternalCrawler]
+    Arxiv[arXiv Papers] --> Crawler
+    Docs[Official Docs] --> Crawler
+    Crawler --> Index[Research Index]
+    Index --> Finding[Research Findings]
+    Finding --> Curator[Curator]
+    Curator --> Candidate[Candidate Skill / Prompt Patch]
+    Candidate --> Validation[Validation Gate]
+    Validation --> Review[Human Review]
+```
+
+The system should not blindly copy external ideas into long-term memory.
+
+External findings should first become:
+
+- evidence;
+- candidate improvement proposals;
+- validation cases;
+- coding prompts for PR-only implementation.
+
+---
+
+## Current Status
+
+StableAgent OS is currently best described as:
+
+```text
+Feature-rich alpha
+```
+
+### Already present
+
+- CLI / HTTP MCP / stdio MCP entry points;
+- `stableagent.task.os_agent` task execution interface;
+- dashboard and observer direction;
+- trace events and run lifecycle concepts;
+- memory, context budget, token report, feedback, eval, and skill-related modules;
+- validation gate and approval specifications;
+- tests covering important directions such as delayed validation, dashboard replay, approval, CLI/runtime, and no-fake-improvement constraints.
+
+### Still not mature enough
+
+- true user-perceived personalization is still weak;
+- token saving is not yet strongly proven by before/after measurement;
+- self-evolution claims still need real benchmark evidence;
+- candidate skill validation needs stronger baseline-vs-candidate A/B tests;
+- dashboard should show evidence and impact, not just events;
+- the harness should remain PR-only and human-reviewed before promotion.
+
+---
+
+## Testing
+
+Run the full test suite:
+
+```bash
+pytest -q
+```
+
+Run selected tests for the core harness direction:
+
+```bash
+pytest \
+  tests/test_cli_without_http.py \
+  tests/test_curator_policy.py \
+  tests/test_delayed_validation.py \
+  tests/test_delayed_validation_v1.py \
+  tests/test_dashboard_history_replay.py \
+  tests/test_learning_impact_no_fake_improvement.py \
+  -q
+```
+
+Run local deployment:
+
+```bash
+chmod +x scripts/deploy_local.sh
+bash scripts/deploy_local.sh
+```
+
+---
+
+## Design Principles
+
+### 1. Do not pretend improvement happened
+
+If no memory was hit, no skill was used, or no validation was run, the system should say so clearly.
+
+### 2. Candidate is not promoted
+
+A failed run may create a candidate skill, but that skill should not become long-term behavior without validation.
+
+### 3. Human review remains the final gate
+
+High-risk actions, skill promotion, and codebase-level changes must stay human-reviewed.
+
+### 4. Token savings must be measured
+
+Token optimization should be shown with baseline-vs-actual comparison, not just claimed.
+
+### 5. The dashboard must explain impact
+
+The user should see what changed, what did not improve, and what needs more evidence.
+
+---
+
+## Roadmap
+
+```mermaid
+flowchart TD
+    P0[Phase 0<br/>Contract Freeze + Audit]
+    P1[Phase 1<br/>LocalRuntime + Thin Gateway]
+    P2[Phase 2<br/>SkillRepo v2 + Duplicate Detection]
+    P3[Phase 3<br/>Curator + Delayed Validation A/B]
+    P4[Phase 4<br/>ExternalCrawler + Research Index]
+    P5[Phase 5<br/>Evidence Dashboard + Impact Report]
+    P6[Phase 6<br/>PR-only Harness CI + Rollback]
+
+    P0 --> P1 --> P2 --> P3 --> P4 --> P5 --> P6
+```
+
+| Phase | Goal | Success Standard |
+|---|---|---|
+| P0 | Freeze contract and required events | golden snapshots pass |
+| P1 | Make gateway thinner and runtime local-first | CLI / stdio work without HTTP dependency |
+| P2 | Build real SkillRepo lifecycle | candidate / validated / promoted are separated |
+| P3 | Validate skills with related-task A/B | no simulated promotion |
+| P4 | Add external research ingestion | GitHub / arXiv findings become evidence, not direct skills |
+| P5 | Improve dashboard evidence | user sees memory, skill, token, validation, and impact |
+| P6 | Add PR-only harness CI | automation stops at ready-for-human-review |
+
+---
+
+## Suggested Portfolio Framing
+
+**Project title**
+
+```text
+StableAgent OS｜A Personal Self-Evolving Harness for AI Coding Agents
+```
+
+**Short description**
+
+```text
+Built a local-first Agent harness that wraps Claude Code / Codex / Cursor with memory routing, context budgeting, trace observability, evaluation, skill curation, validation gates, and human-reviewed self-evolution.
+```
+
+**Interview angle**
+
+```text
+The project does not claim that the Agent magically becomes smarter.
+It turns each Agent run into evidence: what memory was used, what context was protected, what failed, what candidate skill was proposed, and whether later validation proved it useful.
+```
+
+---
+
+## Repository Map
+
+```text
+OS-Agent/
+├── stable_agent/          # core runtime, memory, eval, skill, gateway, approval
+├── web/                   # dashboard and observer UI
+├── api/                   # API routes and adapters
+├── skills/                # skill artifacts and best_skill export
+├── experiments/           # self-iteration experiments and reports
+├── tests/                 # unit, integration, dashboard, validation, approval tests
+├── docs/                  # setup guides and system specifications
+├── scripts/               # local deployment and helper scripts
+├── requirements.txt
+├── pyproject.toml
+└── README.md
+```
+
+---
+
+## Safety Boundary
+
+StableAgent OS should evolve as a **bounded self-iteration harness**:
+
+```text
+Allowed:
+- analyze traces;
+- propose candidate skills;
+- run validation;
+- generate draft patches;
+- create reports;
+- ask for human approval.
+
+Not allowed by default:
+- auto-merge code;
+- auto-deploy;
+- overwrite best_skill.md without review;
+- promote high-risk skills without approval;
+- hide failed validation;
+- claim learning improvement without evidence.
+```
 
 ---
 
 ## License
 
-MIT
-
----
-
-<p align="center">
-  <strong>StableAgent OS — 让 AI Coding 不只是会做，而是可记忆、可复盘、可验证地越用越懂你。</strong>
-</p>
+This repository is an experimental Agent harness project. Use carefully, keep human review enabled, and treat self-evolution as an evidence-gated engineering workflow rather than an unsupervised autonomous process.
