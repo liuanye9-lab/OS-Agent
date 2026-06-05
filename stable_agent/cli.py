@@ -181,12 +181,36 @@ def cmd_mcp_config(args: argparse.Namespace) -> None:
 def cmd_task_run(args: argparse.Namespace) -> None:
     """执行 StableAgent 任务 (CLI Mode)。
 
-    优先调用本地 HTTP MCP，如果 server 不可达则返回明确错误。
+    Phase 1: 默认仍然走 HTTP MCP(向后兼容 V11.4 部署);带 ``--local`` 旗标时
+    走 in-process LocalRuntime,**完全不依赖 HTTP server**。两条路径走同一个
+    ResponseAdapter,所以 dict shape 完全一致(Phase 0 contract snapshot 保护)。
     """
     task_input: str = args.task_input
     open_dashboard: bool = args.open_dashboard
     use_json: bool = args.json
     base = _base_url(args)
+
+    # Phase 1: opt-in LocalRuntime path — no HTTP, no socket.
+    if getattr(args, "local", False):
+        from stable_agent.core.os_agent_handler import run_os_agent
+        output = run_os_agent(
+            task_input=task_input,
+            open_dashboard=open_dashboard,
+            base_url=base,
+        )
+        _output(output, args)
+        if open_dashboard and output.get("observer_url"):
+            try:
+                webbrowser.open(output["observer_url"])
+                if not use_json:
+                    print(f"\n已在浏览器中打开: {output['observer_url']}")
+            except Exception:
+                if not use_json:
+                    print(f"\n无法打开浏览器,请手动访问: {output['observer_url']}")
+        if not output.get("ok"):
+            sys.exit(1)
+        return
+
     mcp_url = f"{base}/mcp/"
 
     rpc_body = {
@@ -521,6 +545,13 @@ def main() -> None:
     run_p = task_sub.add_parser("run", help="执行 StableAgent 任务")
     run_p.add_argument("--task-input", "-t", required=True, help="任务内容")
     run_p.add_argument("--open-dashboard", action="store_true", default=False, help="完成后打开 Dashboard")
+    # Phase 1: opt-in in-process runtime — no HTTP, no socket.
+    run_p.add_argument(
+        "--local",
+        action="store_true",
+        default=False,
+        help="使用 in-process LocalRuntime,完全不依赖 HTTP server (Phase 1)",
+    )
     _add_server_flags(run_p)
     _add_json_flag(run_p)
     run_p.set_defaults(func=cmd_task_run)
