@@ -966,6 +966,7 @@ class UnifiedToolRegistry:
         V9.1: 新增 force_validation_passed 参数控制验证结果。
         事件同步健康检查: emitted_events / sync_errors / event_sync_ok。
         """
+        global logging
         tool_name = "stableagent.task.os_agent"
         logger = logging.getLogger(__name__)
         task_input: str = args.get("task_input", "")
@@ -1036,8 +1037,7 @@ class UnifiedToolRegistry:
                         rs.append_event(ctx.run_id, event)
                 emit_ok = True
             except Exception as emit_exc:
-                import logging
-                logging.getLogger(__name__).warning(
+                logger.warning(
                     "event emit FAILED for %s: %s", event_type, emit_exc)
                 sync_errors.append(f"{event_type}: {emit_exc}")
 
@@ -1161,9 +1161,8 @@ class UnifiedToolRegistry:
                     guard = orch.context_compression_guard
                     cc_decision = guard.protect(task_input=task_input, context_items=context_items, token_budget=budget)
                     cc_decision = guard.enforce_budget(decision=cc_decision, token_budget=budget)
-            except Exception:
-                import logging
-                logging.getLogger(__name__).warning("ContextCompressionGuard 失败，跳过保护")
+            except Exception as exc:
+                logger.warning("ContextCompressionGuard 失败，跳过保护: %s", exc)
 
             guard_payload = {
                 "decision_summary_zh": "上下文压缩保护已完成",
