@@ -100,6 +100,33 @@ def _call_os_agent() -> dict[str, Any]:
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _call_os_agent_failure_validation_failed() -> dict[str, Any]:
+    body = json.dumps({
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {
+            "name": "stableagent.task.os_agent",
+            "arguments": {
+                "task_input": "Phase 0 failure required-events snapshot test",
+                "open_dashboard": False,
+                "force_eval_failed": True,
+                "force_failure_mode": "intent_drift",
+                "force_regression_case": True,
+                "force_skill_patch": True,
+                "force_validation_passed": False,
+                "dry_run_learning": True,
+            },
+        },
+        "id": "phase0-failure-required-events",
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        MCP_URL, data=body,
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 # --------------------------------------------------------------------------- #
 # 静态契约(不需要 server)
 # --------------------------------------------------------------------------- #
@@ -194,3 +221,24 @@ def test_live_run_roadmap_subset_actually_emitted(live_response):
     }
     missing = set(ROADMAP_REQUIRED_SUBSET_6) - emitted_types
     assert not missing, f"roadmap subset events missing: {sorted(missing)}"
+
+
+def test_live_failure_path_emits_validation_checked_for_rejected_candidate():
+    """失败学习路径中,验证失败也必须 emit validation.checked。
+
+    `validation.checked` 表示验证门禁已执行,不是验证通过或自动采用。
+    """
+    if not _server_reachable():
+        pytest.skip(
+            "stable_agent serve not running — start with "
+            "`PYTHONPATH=. .venv/bin/python -m stable_agent.cli serve`"
+        )
+    response = _call_os_agent_failure_validation_failed()
+    data = response["result"]["structuredContent"]["data"]
+    emitted_types = {
+        e["event_type"] for e in data["emitted_events"]
+        if e.get("_emit_ok")
+    }
+    assert "validation.checked" in emitted_types
+    assert data["missing_required_events"] == []
+    assert data["event_sync_ok"] is True

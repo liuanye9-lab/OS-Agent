@@ -1,14 +1,16 @@
 """test_cli_effectiveness — V11.4 CLI effectiveness 命令测试。"""
 from __future__ import annotations
 import json, subprocess, sys
+from pathlib import Path
 from unittest.mock import patch
 import pytest
 CLI_MODULE = "stable_agent.cli"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 class TestEffectivenessParser:
     def test_effectiveness_command_exists(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "effectiveness", "--help"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode == 0
         assert "summary" in result.stdout
@@ -17,13 +19,13 @@ class TestEffectivenessParser:
 
     def test_effectiveness_task_create_requires_args(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "effectiveness", "task", "create"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode != 0
 
     def test_effectiveness_run_record_requires_args(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "effectiveness", "run", "record"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode != 0
 
@@ -31,7 +33,7 @@ class TestEffectivenessExecution:
     def test_server_not_running_returns_error(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "effectiveness", "summary",
             "--json", "--port", "19999"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."}, timeout=10)
         assert result.returncode != 0
         data = json.loads(result.stdout)

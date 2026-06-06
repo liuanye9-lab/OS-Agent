@@ -77,6 +77,8 @@ class ResponseAdapter:
                 "understanding_trace": data.get("understanding_trace"),
                 "token_report": data.get("token_report"),
                 "expression_matches": data.get("expression_matches"),
+                "learning_impact_report": data.get("learning_impact_report"),
+                "memory_hit_report": data.get("memory_hit_report"),
                 # V11.4: 错误信息
                 "error": data.get("error") if not result.ok else None,
                 # 工具元数据

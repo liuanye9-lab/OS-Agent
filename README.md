@@ -6,10 +6,10 @@
   <img src="https://img.shields.io/badge/Human_in_the_Loop-Required-f97316?style=for-the-badge" alt="Human in the Loop" />
 </p>
 
-<h1 align="center">StableAgent OS</h1>
+<h1 align="center">StableAgent Recursive Harness</h1>
 
 <p align="center">
-  <strong>A personal Agent harness for AI Coding workflows.</strong><br />
+  <strong>A personal, evidence-gated self-evolution layer for AI Coding Agents.</strong><br />
   <sub>Memory · Token Budget · Trace · Eval · Skill Curation · Validation Gate · Human Review</sub>
 </p>
 
@@ -35,6 +35,8 @@
 **StableAgent OS** is a local-first harness layer for AI Coding Agents such as Claude Code, Codex, Cursor, Trae, and other MCP-compatible tools.
 
 It is not another chat bot, and it does not fine-tune model weights.
+
+As **StableAgent Recursive Harness**, its role is more specific: it does not replace Codex. It helps Codex and other executors stay aligned with one user over time through explicit user models, evidence-gated memory, candidate skill validation, research evidence cards, and human-reviewed self-iteration.
 
 It sits beside your coding agent and helps it work more consistently by managing:
 

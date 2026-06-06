@@ -6,6 +6,64 @@
 
 ---
 
+## StableAgent Recursive Harness Upgrade (2026-06-06)
+
+### [进度 100%] Phase 0-9 顺序完成
+
+#### Phase 0: 审计与契约冻结 [0% -> 8%]
+- 生成 `docs/recursive_harness/00_CURRENT_STATE_AUDIT.md`
+- 生成 `docs/recursive_harness/01_CONTRACT_FREEZE.md`
+- 生成 `docs/recursive_harness/02_THEORY_MAPPING.md`
+- 生成 `docs/recursive_harness/03_RISK_BOUNDARY.md`
+- 基线结果记录：`pytest` 因本地 venv 缺 `httpx2/httpx` 依赖收集失败；`integration_test.sh` 因裸 `python` 失败；`check_closed_loop.py` 通过。
+
+#### Phase 1: User Model Layer [8% -> 20%]
+- 新增 `stable_agent/user_model/`
+- 新增默认 `.stableagent/user_model/*.yaml`
+- FeedbackParser 将高风险偏好设为 `pending_review`
+
+#### Phase 2: Evidence-Gated Memory [20% -> 32%]
+- 新增 `stable_agent/memory_evidence/`
+- active memory 必须有 `evidence_refs`
+- 支持 conflict detection、decay、hit report
+
+#### Phase 3: Learning Impact Report v2 [32% -> 44%]
+- 新增 `stable_agent/impact/`
+- `stableagent.task.os_agent` 返回 `learning_impact_report`
+- 无 memory hit / promoted skill / A-B 时不会声称对应提升
+
+#### Phase 4: SkillOpt-style Bounded Skill Editor [44% -> 58%]
+- 新增 bounded edit language、textual learning rate、heldout validator、rejected buffer
+- 禁止整篇重写、默认禁止删除、禁止删除 safety / human review 规则
+
+#### Phase 5: Delayed Validation A/B [58% -> 70%]
+- 新增 `stable_agent/validation/`
+- PromotionPolicy 要求 validations、score_delta、regression、event completeness、token delta 和 human review
+
+#### Phase 6: Research Watcher [70% -> 82%]
+- 新增 `stable_agent/research/`
+- CLI: `python -m stable_agent.cli research scan ...`
+- 外部资料只生成 `evidence_only` card
+
+#### Phase 7: PR-only Self Iteration Harness [82% -> 92%]
+- 新增 `stable_agent/self_iteration/`
+- 默认只生成 branch plan / prompt / report，不 push、不 merge、不 deploy
+
+#### Phase 8: Dashboard 个性化进化可视化 [92% -> 98%]
+- `web/templates/run_observer.html` 新增 Recursive Harness 九面板
+- `web/static/run_observer.js` 只渲染公开字段，不展示 hidden chain-of-thought
+
+#### Phase 9: 文档与作品集表达 [98% -> 100%]
+- 新增 `docs/recursive_harness/ARCHITECTURE.md`
+- 新增 `docs/recursive_harness/USER_MODEL.md`
+- 新增 `docs/recursive_harness/SKILL_OPTIMIZATION.md`
+- 新增 `docs/recursive_harness/RESEARCH_WATCHER.md`
+- 新增 `docs/recursive_harness/SELF_ITERATION_SAFETY.md`
+- 新增 `docs/portfolio/CASE_STUDY_RECURSIVE_HARNESS.md`
+- README 定位更新为 StableAgent Recursive Harness
+
+---
+
 ## V9.0 Final Closed-Loop Hardening (2026-05-31 00:48–01:20)
 
 ### [进度 100%] 全部完成

@@ -39,6 +39,8 @@ from stable_agent.skills import (
     Triggers,
 )
 from stable_agent.skills.repository import SkillRepository
+from stable_agent.validation.ab_runner import DelayedValidationABRunner as RecursiveABRunner
+from stable_agent.validation.ab_runner import TaskRunScore
 
 
 # --------------------------------------------------------------------------- #
@@ -115,6 +117,28 @@ def test_ab_runner_passes_clean_uplift():
     assert report.passed is True, report.reason
     assert report.regression_count == 0
     assert report.avg_score_delta > 0.03
+
+
+def test_recursive_ab_runner_requires_two_validations():
+    runner = RecursiveABRunner()
+    one = runner.compare(
+        [TaskRunScore("t1", eval_score=0.7, tokens_used=100)],
+        [TaskRunScore("t1", eval_score=0.8, tokens_used=100)],
+    )
+    assert one.passed is False
+
+    two = runner.compare(
+        [
+            TaskRunScore("t1", eval_score=0.7, tokens_used=100),
+            TaskRunScore("t2", eval_score=0.7, tokens_used=100),
+        ],
+        [
+            TaskRunScore("t1", eval_score=0.75, tokens_used=105),
+            TaskRunScore("t2", eval_score=0.76, tokens_used=104),
+        ],
+    )
+    assert two.passed is True
+    assert two.status == "ready_for_human_review"
 
 
 def test_ab_runner_rejects_when_below_threshold():

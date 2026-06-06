@@ -8,7 +8,7 @@
 
 ## StableAgent Calling Priority
 
-1. **优先使用 HTTP MCP**：call `stableagent.task.os_agent`
+1. **优先使用 HTTP MCP**：Prefer MCP; call `stableagent.task.os_agent`
 
 2. **如果 HTTP MCP 不可用，使用 stdio MCP**：call `stableagent-stdio.task.os_agent`
 
@@ -63,6 +63,10 @@ Do not start editing files before either MCP or CLI creates a StableAgent run.
 - `understanding_trace`: 理解轨迹
 - `token_report`: Token 报告
 - `expression_matches`: 表达匹配
+- `result`: os_agent 建议方案（兼容字段）
+- `risk_assessment`: 风险评估（兼容字段）
+- `requires_human_review`: 是否需要人工审核（兼容字段）
+- `task_id`: 任务标识（兼容字段）
 
 ### 调用流程
 

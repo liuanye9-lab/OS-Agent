@@ -17,6 +17,8 @@ from stable_agent.skill_optimizer.models import (
     ValidationResult,
 )
 from stable_agent.skill_optimizer.rejected_edit_buffer import RejectedEditBuffer
+from stable_agent.skill_optimizer.edit_models import BoundedSkillEdit
+from stable_agent.skill_optimizer.rejected_buffer import RejectedBuffer
 
 
 # ============================================================================
@@ -238,6 +240,14 @@ class TestPersistence:
 
         loaded = buffer_instance.load_recent()
         assert len(loaded) == 2
+
+
+def test_recursive_rejected_buffer_prevents_repeat(tmp_path):
+    buffer = RejectedBuffer(tmp_path / "recursive_rejected.jsonl")
+    edit = BoundedSkillEdit(operation="ADD_RULE", target="Procedure", content="Run pytest first.")
+    buffer.add(edit, "validation did not improve")
+
+    assert buffer.is_repeat(BoundedSkillEdit(operation="ADD_RULE", target="Procedure", content="Run pytest first.")) is True
 
 
 class TestClearBuffer:

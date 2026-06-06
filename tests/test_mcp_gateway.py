@@ -298,7 +298,7 @@ class TestJSONRPCHandler:
         result = resp["result"]
         assert result["protocolVersion"] == "2024-11-05"
         assert result["serverInfo"]["name"] == "StableAgent OS"
-        assert result["serverInfo"]["version"] == "5.0.0"
+        assert result["serverInfo"]["version"] == "11.4.0"
         assert "capabilities" in result
         assert "tools" in result["capabilities"]
 

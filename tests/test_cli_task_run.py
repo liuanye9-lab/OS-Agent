@@ -1,28 +1,30 @@
 """test_cli_task_run — V11.4 CLI task run 命令测试。"""
 from __future__ import annotations
 import json, subprocess, sys
+from pathlib import Path
 from unittest.mock import patch
 import pytest
 
 CLI_MODULE = "stable_agent.cli"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 class TestTaskRunParser:
     def test_task_run_command_exists(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "task", "run", "--help"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode == 0
         assert "task-input" in result.stdout or "task_input" in result.stdout
 
     def test_task_run_requires_task_input(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "task", "run"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode != 0
 
     def test_task_run_short_flag(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "task", "run", "-t", "test", "--help"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode == 0
 
@@ -30,7 +32,7 @@ class TestTaskRunExecution:
     def test_server_not_running_returns_error(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "task", "run",
             "-t", "test task", "--json", "--port", "19999"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."}, timeout=10)
         assert result.returncode != 0
         data = json.loads(result.stdout)

@@ -1,0 +1,32 @@
+"""Default cognitive profile."""
+
+from __future__ import annotations
+
+from stable_agent.user_model.models import CognitiveProfile
+
+
+def default_cognitive_profile() -> CognitiveProfile:
+    return CognitiveProfile(
+        thinking_models=["第一性原理", "证据优先", "先审计再重构", "候选先行"],
+        decision_preferences=[
+            "最小可验证改动优先",
+            "跨模块改动先冻结契约",
+            "外部研究只能先生成 evidence card",
+            "失败经验先变 candidate",
+        ],
+        risk_preferences=[
+            "不要自动修改 main 分支",
+            "不要自动 merge PR",
+            "不要自动 deploy",
+            "不要自动 promote 高风险 skill",
+            "不要覆盖 best_skill.md",
+        ],
+        evidence_requirements=[
+            "pytest",
+            "integration_test",
+            "closed_loop_check",
+            "A/B validation before promotion",
+            "human review before high-risk changes",
+        ],
+        interview_orientation=True,
+    )
