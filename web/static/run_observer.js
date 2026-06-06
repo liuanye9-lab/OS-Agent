@@ -318,13 +318,7 @@ function updateProgress(pct, label) {
   $progressBar.style.width = `${safe}%`;
   $progressText.textContent = label ? `${safe}% — ${label}` : `${safe}%`;
 
-  if (safe >= 100) {
-    $progressPct.style.color = "#34c759";
-  } else if (safe >= 80) {
-    $progressPct.style.color = "#0071e3";
-  } else {
-    $progressPct.style.color = "#1d1d1f";
-  }
+  $progressPct.style.color = "inherit";
 }
 
 // ========== Update Avatar ==========
