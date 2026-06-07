@@ -289,6 +289,7 @@ function applyEvent(evt) {
   if (evt.event_type === "token.budget.estimated" && evt.token_report) {
     renderTokenBudgetPanel({ok: true, token_report: evt.token_report});
   }
+  updateRecursiveHarnessPanels(evt);
   if (evt.event_type === "regression.generated" || evt.event_type === "bad_case.recorded") {
     const bcEl = document.getElementById("badCaseContent");
     if (bcEl) {
@@ -317,13 +318,7 @@ function updateProgress(pct, label) {
   $progressBar.style.width = `${safe}%`;
   $progressText.textContent = label ? `${safe}% — ${label}` : `${safe}%`;
 
-  if (safe >= 100) {
-    $progressPct.style.color = "#34c759";
-  } else if (safe >= 80) {
-    $progressPct.style.color = "#0071e3";
-  } else {
-    $progressPct.style.color = "#1d1d1f";
-  }
+  $progressPct.style.color = "inherit";
 }
 
 // ========== Update Avatar ==========
@@ -810,6 +805,129 @@ function esc(text) {
   const d = document.createElement("div");
   d.textContent = text || "";
   return d.innerHTML;
+}
+
+// ==================================================================
+// Recursive Harness panels
+// ==================================================================
+
+function updateRecursiveHarnessPanels(evt) {
+  if (!evt || typeof evt !== "object") return;
+
+  const publicDecision = pickPublicDecisionFields(evt);
+  if (evt.profile_hits) renderListPanel("rhProfileContent", evt.profile_hits, ["profile", "rule", "why_zh"]);
+  if (evt.memory_hit_report) renderMemoryHitPanel(evt.memory_hit_report);
+  if (evt.learning_impact_report) renderImpactPanel(evt.learning_impact_report);
+  if (evt.si_report || evt.skill_hits) renderSkillHitPanel(evt.si_report || {skill_hits: evt.skill_hits});
+  if (evt.research_findings) renderListPanel("rhResearchContent", evt.research_findings, ["title", "status", "source_url"]);
+  if (evt.learning_impact_report && evt.learning_impact_report.candidate_created) {
+    renderListPanel("rhCandidateContent", evt.learning_impact_report.candidate_created, ["type", "status"]);
+  }
+  if (evt.validation_ab) renderKeyValuePanel("rhValidationContent", evt.validation_ab);
+  if (evt.human_review_queue) renderKeyValuePanel("rhReviewContent", evt.human_review_queue);
+  if (evt.self_iteration_proposal) renderKeyValuePanel("rhSelfIterationContent", evt.self_iteration_proposal);
+
+  if (publicDecision.decision_summary_zh || publicDecision.why_zh || publicDecision.next_step_zh) {
+    const target = document.getElementById("rhImpactContent");
+    if (target && !evt.learning_impact_report) {
+      target.innerHTML = renderPublicDecision(publicDecision);
+    }
+  }
+}
+
+function pickPublicDecisionFields(evt) {
+  return {
+    decision_summary_zh: evt.decision_summary_zh || "",
+    why_zh: evt.why_zh || "",
+    evidence: Array.isArray(evt.evidence) ? evt.evidence : [],
+    next_step_zh: evt.next_step_zh || "",
+  };
+}
+
+function renderPublicDecision(data) {
+  return `
+    ${data.decision_summary_zh ? `<div class="v11-item"><span class="label">decision_summary_zh</span><span class="value">${esc(data.decision_summary_zh)}</span></div>` : ""}
+    ${data.why_zh ? `<div class="v11-item"><span class="label">why_zh</span><span class="value">${esc(data.why_zh)}</span></div>` : ""}
+    ${data.evidence.length ? `<div class="v11-item"><span class="label">evidence</span><span class="value">${data.evidence.map(x => esc(String(x))).join(" | ")}</span></div>` : ""}
+    ${data.next_step_zh ? `<div class="v11-item"><span class="label">next_step_zh</span><span class="value">${esc(data.next_step_zh)}</span></div>` : ""}
+  `;
+}
+
+function renderListPanel(panelId, items, keys) {
+  const el = document.getElementById(panelId);
+  if (!el) return;
+  if (!Array.isArray(items) || items.length === 0) {
+    el.innerHTML = '<div class="empty-state">暂无数据</div>';
+    return;
+  }
+  el.innerHTML = items.slice(0, 6).map((item) => {
+    const rows = keys.map((key) => {
+      const value = item && typeof item === "object" ? item[key] : "";
+      return `<div class="v11-item"><span class="label">${esc(key)}</span><span class="value">${esc(formatPublicValue(value))}</span></div>`;
+    }).join("");
+    return `<div style="margin-bottom:8px">${rows}</div>`;
+  }).join("");
+}
+
+function renderKeyValuePanel(panelId, data) {
+  const el = document.getElementById(panelId);
+  if (!el) return;
+  if (!data || data.status === "none") {
+    el.innerHTML = '<div class="empty-state">暂无数据</div>';
+    return;
+  }
+  const allowed = ["status", "reason_zh", "decision_summary_zh", "why_zh", "next_step_zh", "queue_count", "proposal_id", "branch_name"];
+  el.innerHTML = allowed
+    .filter((key) => data[key] !== undefined && data[key] !== null && data[key] !== "")
+    .map((key) => `<div class="v11-item"><span class="label">${esc(key)}</span><span class="value">${esc(formatPublicValue(data[key]))}</span></div>`)
+    .join("") || '<div class="empty-state">暂无数据</div>';
+}
+
+function renderMemoryHitPanel(report) {
+  const hits = report.memory_hits || [];
+  renderListPanel("rhMemoryContent", hits, ["memory_id", "reason_zh", "source"]);
+}
+
+function renderSkillHitPanel(report) {
+  const skillHits = report.skill_hits || [];
+  if (skillHits.length) {
+    renderListPanel("rhSkillContent", skillHits, ["skill", "status"]);
+    return;
+  }
+  const patches = report.skill_patches || [];
+  if (patches.length) {
+    renderListPanel("rhSkillContent", patches.map(() => ({skill: "candidate_skill_patch", status: "等待验证"})), ["skill", "status"]);
+    return;
+  }
+  renderListPanel("rhSkillContent", [], ["skill", "status"]);
+}
+
+function renderImpactPanel(report) {
+  const el = document.getElementById("rhImpactContent");
+  if (!el) return;
+  if (!report) {
+    el.innerHTML = '<div class="empty-state">暂无 impact report</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="v11-item"><span class="label">overall</span><span class="value">${formatScore(report.overall_impact_score)}</span></div>
+    <div class="v11-item"><span class="label">personalization</span><span class="value">${formatScore(report.personalization_score)}</span></div>
+    <div class="v11-item"><span class="label">memory</span><span class="value">${formatScore(report.memory_impact_score)}</span></div>
+    <div class="v11-item"><span class="label">skill</span><span class="value">${formatScore(report.skill_impact_score)}</span></div>
+    <div class="v11-item"><span class="label">token</span><span class="value">${formatScore(report.token_impact_score)}</span></div>
+    <div class="v11-item"><span class="label">summary</span><span class="value">${esc(report.user_visible_summary_zh || "")}</span></div>
+  `;
+}
+
+function formatScore(value) {
+  const num = Number(value || 0);
+  return `${Math.round(num * 100)}%`;
+}
+
+function formatPublicValue(value) {
+  if (Array.isArray(value)) return value.map((x) => String(x)).join(" | ");
+  if (value && typeof value === "object") return value.decision_summary_zh || value.why_zh || value.status || JSON.stringify(value);
+  return String(value || "");
 }
 
 // ========== Real-time V11 event handling ==========

@@ -3,474 +3,1011 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StableAgent OS - 可视化架构分析</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>StableAgent Recursive Harness - 可视化架构分析</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-    
-    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-    code, .mono { font-family: 'JetBrains Mono', monospace; }
-    
-    .gradient-bg {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --sidebar: #fbfbfb;
+      --surface: #ffffff;
+      --surface-soft: #f7f7f8;
+      --surface-active: #ececec;
+      --line: #e8e8ea;
+      --line-strong: #d7d7dc;
+      --text: #121212;
+      --muted: #6f7077;
+      --quiet: #9a9aa2;
+      --purple: #7b4ff6;
+      --purple-deep: #5f34d9;
+      --purple-soft: #f1edff;
+      --blue: #4b86f7;
+      --pink: #f064b7;
+      --orange: #f2994a;
+      --green: #19a66a;
+      --shadow: 0 12px 30px rgba(18, 18, 18, .08);
+      --shadow-soft: 0 8px 22px rgba(18, 18, 18, .06);
+      --radius-lg: 20px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
     }
-    
-    .card-hover {
-      transition: all 0.3s ease;
-      border: 1px solid #e5e7eb;
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
     }
-    
-    .card-hover:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-      border-color: #667eea;
+
+    button, input { font: inherit; }
+    button { border: 0; cursor: pointer; }
+
+    .mono {
+      font-family: "SFMono-Regular", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
     }
-    
-    .flow-arrow {
-      animation: flowPulse 2s ease-in-out infinite;
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 286px minmax(0, 1fr);
+      min-width: 0;
     }
-    
-    @keyframes flowPulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 1; }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 18px 14px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--line);
     }
-    
-    .step-active {
-      animation: stepGlow 1.5s ease-in-out infinite;
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 2px;
     }
-    
-    @keyframes stepGlow {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4); }
-      50% { box-shadow: 0 0 0 8px rgba(102, 126, 234, 0); }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #7b4ff6, #4b86f7);
+      color: #fff;
+      box-shadow: 0 14px 26px rgba(95, 52, 217, .22);
     }
-    
-    .skill-node {
-      transition: all 0.3s ease;
+
+    .brand-mark svg { width: 23px; height: 23px; }
+
+    .brand-title {
+      font-size: 18px;
+      line-height: 1.1;
+      font-weight: 780;
     }
-    
-    .skill-node:hover {
-      transform: scale(1.05);
+
+    .brand-subtitle {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
     }
-    
-    .tab-active {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+
+    .side-search {
+      height: 46px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: #f4f4f5;
+      color: var(--muted);
+    }
+
+    .side-search input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      color: var(--text);
+      background: transparent;
+      font-size: 14px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 4px;
+    }
+
+    .nav-button {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 13px;
+      border-radius: 14px;
+      background: transparent;
+      color: var(--text);
+      transition: background .18s ease, color .18s ease;
+    }
+
+    .nav-button:hover { background: var(--surface-active); }
+    .nav-button.active { background: #e5e5e7; }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .nav-icon {
+      width: 21px;
+      height: 21px;
+      color: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .nav-label {
+      font-size: 15px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .nav-pill {
+      min-width: 24px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      color: var(--text);
+      background: #fff;
+      font-size: 12px;
+      font-weight: 720;
+      box-shadow: 0 0 0 1px var(--line);
+    }
+
+    .side-footer {
+      margin-top: auto;
+      display: grid;
+      gap: 10px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .side-footer-row {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 620;
+    }
+
+    .profile-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #f1f1f3;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 780;
+    }
+
+    .mini-pill {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #f5f5f6;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .main {
+      min-width: 0;
+      padding: 0 28px 34px;
+    }
+
+    .topbar {
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .page-title {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      min-width: 0;
+      font-size: 20px;
+      font-weight: 760;
+    }
+
+    .menu-toggle {
+      width: 22px;
+      height: 22px;
+      color: var(--text);
+    }
+
+    .top-icons {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .icon-button {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--text);
+      background: transparent;
+    }
+
+    .icon-button:hover { background: var(--surface-soft); }
+
+    .notification-dot {
+      position: absolute;
+      right: 7px;
+      top: 5px;
+      width: 17px;
+      height: 17px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #ff4d5e;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      border: 2px solid #fff;
+    }
+
+    .user-ring {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #111;
+      background: linear-gradient(135deg, #f5f5f5, #e7e7ec);
+    }
+
+    .workspace-tabs {
+      margin: 26px 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .tab-strip {
+      height: 47px;
+      min-width: min(680px, 58vw);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid #f0f0f1;
+      border-radius: 17px;
+      background: #f4f4f5;
+    }
+
+    .tab-button {
+      height: 38px;
+      border-radius: 13px;
+      color: var(--muted);
+      background: transparent;
+      font-size: 14px;
+      font-weight: 650;
+      transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+    }
+
+    .tab-button.active {
+      color: var(--text);
+      background: #fff;
+      box-shadow: 0 4px 15px rgba(18, 18, 18, .06);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toolbar-button {
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 17px;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 720;
+      white-space: nowrap;
+    }
+
+    .toolbar-button.secondary {
+      color: var(--text);
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .toolbar-button.primary {
+      color: #fff;
+      background: #111;
+    }
+
+    .hero {
+      position: relative;
+      min-height: 292px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 30px;
+      padding: 36px;
+      border-radius: 24px;
+      overflow: hidden;
+      color: #fff;
+      background:
+        radial-gradient(circle at 85% 50%, rgba(255,255,255,.24), transparent 14%),
+        linear-gradient(125deg, #8b54f7 0%, #7562f1 45%, #4b86f7 100%);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: 58px;
+      top: 50%;
+      width: 156px;
+      height: 156px;
+      border-radius: 50%;
+      transform: translateY(-50%);
+      background:
+        radial-gradient(circle, rgba(255,255,255,.62) 0 15%, rgba(255,255,255,.33) 16% 29%, transparent 30%),
+        repeating-radial-gradient(circle, rgba(255,255,255,.22) 0 13px, transparent 14px 27px);
+      opacity: .9;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+    }
+
+    .hero-label {
+      width: max-content;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      color: rgba(255,255,255,.88);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    h1 {
+      margin: 20px 0 14px;
+      font-size: clamp(28px, 3.3vw, 42px);
+      line-height: 1.05;
+      font-weight: 830;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .hero p {
+      max-width: 640px;
+      margin: 0;
+      color: rgba(255,255,255,.82);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .hero-button {
+      height: 43px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      border-radius: 15px;
+      font-size: 14px;
+      font-weight: 720;
+    }
+
+    .hero-button.light {
+      color: var(--purple-deep);
+      background: #fff;
+    }
+
+    .hero-button.ghost {
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.58);
+      background: rgba(255,255,255,.07);
+    }
+
+    .section-row {
+      margin-top: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .section-row h2 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.1;
+      font-weight: 820;
+    }
+
+    .view-link {
+      color: var(--text);
+      background: transparent;
+      font-size: 14px;
+      font-weight: 680;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .app-card {
+      min-height: 204px;
+      padding: 22px;
+      border: 1px solid var(--line-strong);
+      border-radius: 22px;
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .app-icon {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 15px;
+      background: var(--purple-soft);
+      color: var(--purple);
+    }
+
+    .app-icon.orange {
+      color: var(--orange);
+      background: #fff2e6;
+    }
+
+    .app-icon.pink {
+      color: var(--pink);
+      background: #fff0f8;
+    }
+
+    .star {
+      width: 24px;
+      height: 24px;
+      color: #111;
+      background: transparent;
+    }
+
+    .app-card h3 {
+      margin: 0 0 7px;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 790;
+    }
+
+    .app-card p {
+      min-height: 45px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.48;
+    }
+
+    .open-button {
+      width: 100%;
+      height: 42px;
+      margin-top: 18px;
+      border-radius: 15px;
+      color: #111;
+      background: #f4f4f5;
+      font-size: 14px;
+      font-weight: 720;
+    }
+
+    .lower-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 24px;
+      margin-top: 18px;
+    }
+
+    .list-panel {
+      min-height: 270px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .list-item {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .list-item:last-child { border-bottom: 0; }
+
+    .file-icon {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      background: #f4f4f5;
+      color: var(--purple);
+    }
+
+    .list-title {
+      font-size: 15px;
+      font-weight: 740;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-pill {
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--purple-soft);
+      color: var(--purple-deep);
+      font-size: 12px;
+      font-weight: 760;
+      white-space: nowrap;
+    }
+
+    .status-pill.green {
+      color: var(--green);
+      background: #eaf8f1;
+    }
+
+    .status-pill.orange {
+      color: #b86518;
+      background: #fff3e5;
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    footer {
+      margin: 30px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 1120px) {
+      .app-shell { grid-template-columns: 230px minmax(0, 1fr); }
+      .workspace-tabs {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .tab-strip {
+        width: 100%;
+        min-width: 0;
+      }
+      .toolbar-actions {
+        justify-content: flex-end;
+      }
+      .app-grid {
+        grid-template-columns: 1fr;
+      }
+      .lower-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        width: 100%;
+        max-width: 100vw;
+        overflow: hidden;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .side-search,
+      .side-footer {
+        display: none;
+      }
+      .nav {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        max-width: 100%;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+      }
+      .nav::-webkit-scrollbar { display: none; }
+      .nav-button {
+        min-width: max-content;
+        min-height: 42px;
+      }
+      .main {
+        width: 100%;
+        max-width: 100vw;
+        overflow: hidden;
+        padding: 0 16px 28px;
+      }
+      .topbar {
+        height: auto;
+        min-height: 62px;
+      }
+      .page-title {
+        font-size: 17px;
+      }
+      .top-icons {
+        gap: 8px;
+      }
+      .tab-strip {
+        display: flex;
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .tab-strip::-webkit-scrollbar { display: none; }
+      .tab-button {
+        flex: 0 0 95px;
+      }
+      .toolbar-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+        min-width: 0;
+      }
+      .toolbar-button {
+        width: 100%;
+        min-width: 0;
+      }
+      .hero {
+        min-height: 330px;
+        padding: 26px;
+      }
+      .hero::after {
+        right: -18px;
+        top: 38px;
+        width: 126px;
+        height: 126px;
+      }
+      .section-row {
+        margin-top: 24px;
+      }
+      .list-item {
+        grid-template-columns: 38px minmax(0, 1fr);
+      }
+      .status-pill {
+        grid-column: 2;
+        width: max-content;
+      }
+    }
+
+    @media (max-width: 460px) {
+      .brand-title { font-size: 17px; }
+      .brand-mark { width: 38px; height: 38px; }
+      .workspace-tabs { margin: 16px 0 18px; }
+      .topbar { gap: 10px; }
+      .page-title span { display: none; }
+      .hero-actions,
+      .toolbar-actions {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+      .hero-button {
+        width: 100%;
+      }
+      .app-card {
+        min-height: 190px;
+      }
     }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-  
-  <!-- Header -->
-  <header class="gradient-bg text-white py-12 px-6">
-    <div class="max-w-6xl mx-auto">
-      <div class="flex items-center gap-4 mb-4">
-        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl font-bold">SA</div>
-        <div>
-          <h1 class="text-3xl font-semibold">StableAgent OS</h1>
-          <p class="text-white/80 text-sm mt-1">给 AI Coding Agent 配一套"外接大脑"</p>
-        </div>
-      </div>
-      <p class="text-white/90 max-w-2xl mt-6 leading-relaxed">
-        StableAgent OS 是一个本地优先的 Agent 控制层，通过记忆路由、上下文预算、追踪观测、评估、技能策展和人工审核，让 AI Coding Agent 更稳定地理解你的意图。
-      </p>
-    </div>
-  </header>
-
-  <!-- Navigation Tabs -->
-  <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-6">
-      <div class="flex gap-1 overflow-x-auto">
-        <button onclick="showSection('analogy')" id="tab-analogy" class="tab-active px-4 py-3 text-sm font-medium rounded-t-lg transition-all whitespace-nowrap">类比架构</button>
-        <button onclick="showSection('workflow')" id="tab-workflow" class="px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-t-lg transition-all whitespace-nowrap">任务流程</button>
-        <button onclick="showSection('skill')" id="tab-skill" class="px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-t-lg transition-all whitespace-nowrap">技能生命周期</button>
-        <button onclick="showSection('metrics')" id="tab-metrics" class="px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-t-lg transition-all whitespace-nowrap">效果指标</button>
-        <button onclick="showSection('components')" id="tab-components" class="px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-t-lg transition-all whitespace-nowrap">核心组件</button>
-      </div>
-    </div>
-  </nav>
-
-  <main class="max-w-6xl mx-auto px-6 py-8">
-    
-    <!-- Section 1: Analogy Architecture -->
-    <section id="section-analogy" class="space-y-8">
-      <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">核心类比：学习装备系统</h2>
-        <p class="text-gray-600 mb-8">把 StableAgent OS 想象成一套给 AI 学生配备的学习装备，而不是改造学生的大脑。</p>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <!-- Analogy Cards -->
-          <div class="card-hover bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
-            <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">🎓</div>
-            <h3 class="font-semibold text-gray-900 mb-2">大模型 = 学生</h3>
-            <p class="text-sm text-gray-600">Claude / GPT / Qwen / DeepSeek 各有特长，就像不同学生。有的写代码强但容易过度修改，有的推理强但工具调用慢。</p>
-          </div>
-          
-          <div class="card-hover bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6">
-            <div class="w-12 h-12 bg-amber-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">👨‍🏫</div>
-            <h3 class="font-semibold text-gray-900 mb-2">用户反馈 = 老师</h3>
-            <p class="text-sm text-gray-600">你对模型的每次纠正和反馈，就像老师对学生的指导，帮助模型理解你的真实意图。</p>
-          </div>
-          
-          <div class="card-hover bg-gradient-to-br from-red-50 to-pink-50 rounded-xl p-6">
-            <div class="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">📕</div>
-            <h3 class="font-semibold text-gray-900 mb-2">Bad Case = 错题本</h3>
-            <p class="text-sm text-gray-600">记录模型犯过的错，形成回归测试用例，避免同一个错误反复出现。</p>
-          </div>
-          
-          <div class="card-hover bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6">
-            <div class="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">📋</div>
-            <h3 class="font-semibold text-gray-900 mb-2">Skill Patch = 学习计划</h3>
-            <p class="text-sm text-gray-600">把失败经验转化为可复用的规则，像学习计划一样指导未来的任务执行。</p>
-          </div>
-          
-          <div class="card-hover bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6">
-            <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">💼</div>
-            <h3 class="font-semibold text-gray-900 mb-2">Agent Capsule = 书包</h3>
-            <p class="text-sm text-gray-600">打包你的记忆、规则、习惯和评测标准，像 U 盘一样在不同 AI 工具间迁移。</p>
-          </div>
-          
-          <div class="card-hover bg-gradient-to-br from-cyan-50 to-teal-50 rounded-xl p-6">
-            <div class="w-12 h-12 bg-cyan-500 rounded-lg flex items-center justify-center text-white text-xl mb-4">📊</div>
-            <h3 class="font-semibold text-gray-900 mb-2">Dashboard = 成绩单</h3>
-            <p class="text-sm text-gray-600">可视化展示 Agent 每一步的理解、压缩、判断和学习过程，透明可追溯。</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Visual Flow -->
-      <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-        <h3 class="text-lg font-semibold text-gray-900 mb-6">数据流向图</h3>
-        <div class="relative overflow-x-auto">
-          <svg viewBox="0 0 900 300" class="w-full min-w-[600px]" style="max-height: 300px;">
-            <!-- Connections -->
-            <defs>
-              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
-              </marker>
-            </defs>
-            
-            <!-- Arrows -->
-            <line x1="140" y1="150" x2="210" y2="150" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowhead)" class="flow-arrow"/>
-            <line x1="390" y1="150" x2="460" y2="150" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowhead)" class="flow-arrow"/>
-            <line x1="640" y1="150" x2="710" y2="150" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowhead)" class="flow-arrow"/>
-            <line x1="210" y1="100" x2="210" y2="80" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4"/>
-            <line x1="210" y1="80" x2="700" y2="80" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4"/>
-            <line x1="700" y1="80" x2="700" y2="120" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4"/>
-            
-            <!-- Nodes -->
-            <g transform="translate(50, 120)">
-              <rect width="90" height="60" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
-              <text x="45" y="30" text-anchor="middle" class="th" fill="#1e40af">用户输入</text>
-              <text x="45" y="50" text-anchor="middle" class="ts" fill="#1e40af">任务描述</text>
-            </g>
-            
-            <g transform="translate(210, 120)">
-              <rect width="180" height="60" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
-              <text x="90" y="28" text-anchor="middle" class="th" fill="#4c1d95">StableAgent OS</text>
-              <text x="90" y="50" text-anchor="middle" class="ts" fill="#4c1d95">理解 / 记忆 / 约束</text>
-            </g>
-            
-            <g transform="translate(460, 120)">
-              <rect width="180" height="60" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/>
-              <text x="90" y="28" text-anchor="middle" class="th" fill="#831843">执行与追踪</text>
-              <text x="90" y="50" text-anchor="middle" class="ts" fill="#831843">Token / Eval / Trace</text>
-            </g>
-            
-            <g transform="translate(710, 120)">
-              <rect width="130" height="60" rx="8" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
-              <text x="65" y="30" text-anchor="middle" class="th" fill="#065f46">Dashboard</text>
-              <text x="65" y="50" text-anchor="middle" class="ts" fill="#065f46">可视化反馈</text>
-            </g>
-            
-            <!-- Feedback loop label -->
-            <text x="450" y="70" text-anchor="middle" class="ts" fill="#6b7280">← 学习闭环：反馈 → 记忆 → 改进</text>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="StableAgent navigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M5 14.5 14.5 5M8.5 6.5l-2-2M17.5 15.5l2 2M14 20l6-6M4 10l6-6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+            <path d="M8 17h8" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
           </svg>
         </div>
+        <div>
+          <div class="brand-title">StableAgent</div>
+          <div class="brand-subtitle">Recursive Suite</div>
+        </div>
       </div>
-    </section>
 
-    <!-- Section 2: Workflow -->
-    <section id="section-workflow" class="hidden space-y-8">
-      <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">任务执行流程</h2>
-        <p class="text-gray-600 mb-8">每个任务从接收到完成，都经历一个可追踪、可审查的完整生命周期。</p>
-        
-        <div class="relative">
-          <div class="grid grid-cols-1 md:grid-cols-5 gap-4" id="workflow-steps">
-            <!-- Steps will be rendered by JS -->
+      <label class="side-search">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="m21 21-4.2-4.2m1.2-5.3a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input value="Search..." readonly>
+      </label>
+
+      <nav class="nav">
+        <button class="nav-button active" data-panel="home" type="button">
+          <span class="nav-left">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3V10.5Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>
+            <span class="nav-label">Home</span>
+          </span>
+        </button>
+        <button class="nav-button" data-panel="apps" type="button">
+          <span class="nav-left">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            <span class="nav-label">Apps</span>
+          </span>
+          <span class="nav-pill">9</span>
+        </button>
+        <button class="nav-button" data-panel="files" type="button">
+          <span class="nav-left">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M14 3v5h4" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>
+            <span class="nav-label">Files</span>
+          </span>
+        </button>
+        <button class="nav-button" data-panel="projects" type="button">
+          <span class="nav-left">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Zm8 8-8 4-8-4m16 4-8 4-8-4" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>
+            <span class="nav-label">Projects</span>
+          </span>
+          <span class="nav-pill">4</span>
+        </button>
+        <button class="nav-button" data-panel="learn" type="button">
+          <span class="nav-left">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5.5A4.5 4.5 0 0 1 8.5 10H20v9H8.5A4.5 4.5 0 0 0 4 14.5v-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            <span class="nav-label">Learn</span>
+          </span>
+        </button>
+        <button class="nav-button" data-panel="resources" type="button">
+          <span class="nav-left">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 4h12v17l-6-3-6 3V4Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>
+            <span class="nav-label">Resources</span>
+          </span>
+        </button>
+      </nav>
+
+      <div class="side-footer">
+        <div class="side-footer-row">
+          <span class="nav-left">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8"/><path d="M19 12a7.3 7.3 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a8 8 0 0 0-1.7-1L14.5 3h-5l-.3 3a8 8 0 0 0-1.7 1L5.1 6l-2 3.5L5 11a7.3 7.3 0 0 0 0 2l-1.9 1.5 2 3.5 2.4-1a8 8 0 0 0 1.7 1l.3 3h5l.3-3a8 8 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5c.1-.3.1-.7.1-1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            Settings
+          </span>
+        </div>
+        <div class="side-footer-row">
+          <span class="profile-chip"><span class="avatar">ZH</span> Zhuanz</span>
+          <span class="mini-pill">Pro</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="page-title">
+          <svg class="menu-toggle" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 5v14M18 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>StableAgent Recursive</span>
+        </div>
+        <div class="top-icons">
+          <button class="icon-button" type="button" aria-label="Cloud sync"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M7 18h10a4 4 0 0 0 .7-7.9A6 6 0 0 0 6.2 8 4.8 4.8 0 0 0 7 18Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="icon-button" type="button" aria-label="Messages"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M5 6h14v10H8l-3 3V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+          <button class="icon-button" type="button" aria-label="Notifications"><span class="notification-dot">5</span><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="user-ring" aria-label="User profile"></div>
+        </div>
+      </header>
+
+      <div class="workspace-tabs">
+        <div class="tab-strip" role="tablist" aria-label="StableAgent views">
+          <button class="tab-button active" data-panel="home" type="button">Home</button>
+          <button class="tab-button" data-panel="apps" type="button">Apps</button>
+          <button class="tab-button" data-panel="files" type="button">Files</button>
+          <button class="tab-button" data-panel="projects" type="button">Projects</button>
+          <button class="tab-button" data-panel="learn" type="button">Learn</button>
+        </div>
+        <div class="toolbar-actions">
+          <button class="toolbar-button secondary" type="button">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 20h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Install MCP
+          </button>
+          <button class="toolbar-button primary" type="button">+ New Run</button>
+        </div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-content">
+          <div class="hero-label">Evidence-Gated</div>
+          <h1>Welcome to StableAgent Recursive Suite</h1>
+          <p>用一个轻量 dashboard 管理 User Model、Memory Evidence、SkillOpt、Research Watcher、A/B Validation 和 Human Review。它不替代 Codex，而是让执行器长期对齐你。</p>
+          <div class="hero-actions">
+            <button class="hero-button light" type="button">Explore Layers</button>
+            <button class="hero-button ghost" type="button">Take a Tour</button>
           </div>
-          
-          <div class="mt-8 p-6 bg-gray-50 rounded-xl">
-            <h4 class="font-medium text-gray-900 mb-3">当前阶段说明</h4>
-            <div id="step-detail" class="text-sm text-gray-600">
-              <p>点击上方步骤查看详细说明。</p>
+        </div>
+      </section>
+
+      <section class="panel active" id="panel-home">
+        <div class="section-row">
+          <h2>Recent Apps</h2>
+          <button class="view-link" type="button">View All</button>
+        </div>
+        <div class="app-grid">
+          <article class="app-card">
+            <div class="card-head">
+              <div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 5h14v14H5zM8 15l3-3 2 2 3-4 2 3" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></div>
+              <button class="star" type="button" aria-label="Favorite User Model"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
             </div>
-          </div>
-        </div>
-      </div>
-    </section>
+            <h3>User Model</h3>
+            <p>ExpressionProfile、CognitiveProfile 和 Temperament Policy。</p>
+            <button class="open-button" type="button">Open</button>
+          </article>
 
-    <!-- Section 3: Skill Lifecycle -->
-    <section id="section-skill" class="hidden space-y-8">
-      <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">技能生命周期</h2>
-        <p class="text-gray-600 mb-8">技能从产生到推广，必须经过严格的验证门控，确保只有真正有效的规则才会进入长期记忆。</p>
-        
-        <div class="flex flex-wrap justify-center gap-3 mb-8" id="skill-lifecycle-nodes">
-          <!-- Nodes rendered by JS -->
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          <div class="p-5 bg-amber-50 rounded-xl border border-amber-200">
-            <h4 class="font-medium text-amber-900 mb-2">关键规则</h4>
-            <ul class="text-sm text-amber-800 space-y-2">
-              <li>• draft → candidate → validated → promoted → deprecated → archived</li>
-              <li>• candidate 不能直接 promoted，必须先 validated</li>
-              <li>• 只有 promoted 才进入默认检索</li>
-              <li>• 不自动覆盖 best_skill.md</li>
-              <li>• 失败经验不直接写入长期 SkillRepo</li>
-            </ul>
-          </div>
-          
-          <div class="p-5 bg-blue-50 rounded-xl border border-blue-200">
-            <h4 class="font-medium text-blue-900 mb-2">推广条件（必须全部满足）</h4>
-            <ul class="text-sm text-blue-800 space-y-1 mono">
-              <li>schema_valid = true</li>
-              <li>validations >= 2</li>
-              <li>score_delta >= +0.03</li>
-              <li>regression_count = 0</li>
-              <li>event_completeness = 1.0</li>
-              <li>token_delta <= +0.10</li>
-              <li>high_risk_requires_human_review = true</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 4: Metrics -->
-    <section id="section-metrics" class="hidden space-y-8">
-      <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">效果评估指标</h2>
-        <p class="text-gray-600 mb-8">Effectiveness Dashboard 用 A/B 对比数据证明 StableAgent 是否真的有效。</p>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div>
-            <h3 class="font-medium text-gray-900 mb-4">核心指标一览</h3>
-            <div class="space-y-3" id="metrics-list">
-              <!-- Rendered by JS -->
+          <article class="app-card">
+            <div class="card-head">
+              <div class="app-icon orange"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="m13 7 4 4" stroke="currentColor" stroke-width="1.9"/></svg></div>
+              <button class="star" type="button" aria-label="Favorite SkillOpt"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
             </div>
-          </div>
-          
-          <div>
-            <h3 class="font-medium text-gray-900 mb-4">A/B 对比示意</h3>
-            <div class="bg-gray-50 rounded-xl p-4">
-              <canvas id="abChart" height="220"></canvas>
+            <h3>SkillOpt</h3>
+            <p>Bounded text edits、rejected buffer 和 held-out validation。</p>
+            <button class="open-button" type="button">Open</button>
+          </article>
+
+          <article class="app-card">
+            <div class="card-head">
+              <div class="app-icon pink"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 7h11v10H4zM15 10l5-3v10l-5-3" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></div>
+              <button class="star" type="button" aria-label="Favorite Research"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
             </div>
-            <p class="text-xs text-gray-500 mt-2 text-center">Baseline（直接使用）vs StableAgent 模式对比</p>
+            <h3>Research Watcher</h3>
+            <p>arXiv、GitHub 和官方文档只生成 evidence cards。</p>
+            <button class="open-button" type="button">Open</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-apps">
+        <div class="section-row"><h2>Harness Apps</h2><button class="view-link" type="button">View All</button></div>
+        <div class="app-grid">
+          <article class="app-card"><div class="card-head"><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.9"/></svg></div></div><h3>Learning Impact</h3><p>诚实报告 personalization、memory、skill 和 evidence 得分。</p><button class="open-button" type="button">Open</button></article>
+          <article class="app-card"><div class="card-head"><div class="app-icon orange"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 3v18M4 9h16M4 15h16" stroke="currentColor" stroke-width="1.9"/></svg></div></div><h3>A/B Validation</h3><p>baseline-vs-candidate 对比，零回归才允许进入人审。</p><button class="open-button" type="button">Open</button></article>
+          <article class="app-card"><div class="card-head"><div class="app-icon pink"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="1.9"/></svg></div></div><h3>Self Iteration</h3><p>只生成 proposal、Codex prompt 和 PR summary，不自动 merge。</p><button class="open-button" type="button">Open</button></article>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-files">
+        <div class="section-row"><h2>Recent Files</h2><button class="view-link" type="button">View All</button></div>
+        <div class="lower-grid">
+          <div class="list-panel">
+            <div class="list-item"><div class="file-icon">01</div><div><div class="list-title">00_CURRENT_STATE_AUDIT.md</div><div class="list-meta">Phase 0 audit and technical debt</div></div><span class="status-pill">Audit</span></div>
+            <div class="list-item"><div class="file-icon">02</div><div><div class="list-title">ARCHITECTURE.md</div><div class="list-meta">Recursive Harness architecture map</div></div><span class="status-pill green">Ready</span></div>
+            <div class="list-item"><div class="file-icon">03</div><div><div class="list-title">SELF_ITERATION_SAFETY.md</div><div class="list-meta">PR-only safety boundary</div></div><span class="status-pill orange">Gate</span></div>
+          </div>
+          <div class="list-panel">
+            <div class="list-item"><div class="file-icon">UM</div><div><div class="list-title">expression_profile.yaml</div><div class="list-meta">中文优先、分阶段、验收标准</div></div><span class="status-pill green">Active</span></div>
+            <div class="list-item"><div class="file-icon">CP</div><div><div class="list-title">cognitive_profile.yaml</div><div class="list-meta">第一性原理、证据优先</div></div><span class="status-pill green">Active</span></div>
+            <div class="list-item"><div class="file-icon">TP</div><div><div class="list-title">temperament_policy.yaml</div><div class="list-meta">稳定、直接、高风险人审</div></div><span class="status-pill green">Active</span></div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Section 5: Components -->
-    <section id="section-components" class="hidden space-y-8">
-      <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">核心组件详解</h2>
-        <p class="text-gray-600 mb-8">StableAgent OS 由多个协同工作的组件构成，每个组件承担特定职责。</p>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="components-grid">
-          <!-- Rendered by JS -->
+      <section class="panel" id="panel-projects">
+        <div class="section-row"><h2>Active Projects</h2><button class="view-link" type="button">View All</button></div>
+        <div class="lower-grid">
+          <div class="list-panel">
+            <div class="list-item"><div class="file-icon">AB</div><div><div class="list-title">Delayed Validation A/B</div><div class="list-meta">validations ≥ 2, score_delta ≥ +0.03</div></div><span class="status-pill orange">Required</span></div>
+            <div class="list-item"><div class="file-icon">HR</div><div><div class="list-title">Human Review Queue</div><div class="list-meta">high-risk skill cannot auto promote</div></div><span class="status-pill">Manual</span></div>
+            <div class="list-item"><div class="file-icon">PR</div><div><div class="list-title">PR-only Self Iteration</div><div class="list-meta">branch plan, prompt, tests, summary</div></div><span class="status-pill green">Safe</span></div>
+          </div>
+          <div class="list-panel">
+            <div class="list-item"><div class="file-icon">55</div><div><div class="list-title">MCP Gateway</div><div class="list-meta">55 tools registered, schema compatibility preserved</div></div><span class="status-pill green">Online</span></div>
+            <div class="list-item"><div class="file-icon">13</div><div><div class="list-title">Event Chain</div><div class="list-meta">required events replay into dashboard</div></div><span class="status-pill green">Complete</span></div>
+            <div class="list-item"><div class="file-icon">0</div><div><div class="list-title">Auto Merge</div><div class="list-meta">merge/deploy/promote are never automatic</div></div><span class="status-pill orange">Blocked</span></div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-  </main>
+      <section class="panel" id="panel-learn">
+        <div class="section-row"><h2>Learn</h2><button class="view-link" type="button">View All</button></div>
+        <div class="app-grid">
+          <article class="app-card"><div class="card-head"><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4zM8 10h8M8 14h5" stroke="currentColor" stroke-width="1.9"/></svg></div></div><h3>Evidence First</h3><p>没有 memory hit、promoted skill 或 A/B 时，不声称对应提升。</p><button class="open-button" type="button">Open</button></article>
+          <article class="app-card"><div class="card-head"><div class="app-icon orange"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 4v16M6 8h12M6 16h12" stroke="currentColor" stroke-width="1.9"/></svg></div></div><h3>Bounded Edits</h3><p>只允许 ADD / DELETE / REPLACE section or rule，小步验证。</p><button class="open-button" type="button">Open</button></article>
+          <article class="app-card"><div class="card-head"><div class="app-icon pink"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 19 19 5M7 7h4v4H7zM13 13h4v4h-4z" stroke="currentColor" stroke-width="1.9"/></svg></div></div><h3>Research Cards</h3><p>论文和开源项目先进入 evidence_only，再由 proposal 转 candidate。</p><button class="open-button" type="button">Open</button></article>
+        </div>
+      </section>
 
-  <!-- Footer -->
-  <footer class="border-t border-gray-200 mt-16 py-8 bg-white">
-    <div class="max-w-6xl mx-auto px-6 text-center text-sm text-gray-500">
-      <p>StableAgent OS · MIT License · 让 AI Coding 可记忆、可复盘、可验证</p>
-    </div>
-  </footer>
+      <section class="panel" id="panel-resources">
+        <div class="section-row"><h2>Resources</h2><button class="view-link" type="button">View All</button></div>
+        <div class="lower-grid">
+          <div class="list-panel">
+            <div class="list-item"><div class="file-icon">T</div><div><div class="list-title">Theory Mapping</div><div class="list-meta">SkillOS, SkillOpt, Reflexion, MemGPT, LangGraph</div></div><span class="status-pill">Map</span></div>
+            <div class="list-item"><div class="file-icon">R</div><div><div class="list-title">Risk Boundary</div><div class="list-meta">no auto deploy, no auto best_skill overwrite</div></div><span class="status-pill orange">Guard</span></div>
+          </div>
+          <div class="list-panel">
+            <div class="list-item"><div class="file-icon">CI</div><div><div class="list-title">Final Verification</div><div class="list-meta">pytest, integration, closed-loop, impact, research scan</div></div><span class="status-pill green">Passed</span></div>
+            <div class="list-item"><div class="file-icon">UX</div><div><div class="list-title">README Visual</div><div class="list-meta">Designali-inspired product dashboard</div></div><span class="status-pill">Updated</span></div>
+          </div>
+        </div>
+      </section>
+
+      <footer>StableAgent OS · personal, evidence-gated self-evolution layer for AI Coding Agents</footer>
+    </main>
+  </div>
 
   <script>
-    // Data
-    const workflowSteps = [
-      { id: 'received', title: '接收', subtitle: '任务提交', color: 'blue', detail: '用户通过 MCP 或 CLI 提交任务。系统记录 run_id、时间戳、输入来源。' },
-      { id: 'parsed', title: '解析', subtitle: '意图理解', color: 'purple', detail: '生成 Understanding Trace：系统如何理解你的原话，有哪些假设和不确定点。' },
-      { id: 'context', title: '上下文', subtitle: '预算构建', color: 'amber', detail: '根据 Token Budget 保护关键约束，压缩非关键上下文，防止重要信息被丢弃。' },
-      { id: 'execute', title: '执行', subtitle: '工作流运行', color: 'green', detail: '调用 Coding Agent 执行任务，实时追踪事件流，记录每一步的决策依据。' },
-      { id: 'eval', title: '评估', subtitle: '结果验证', color: 'coral', detail: '评估结果是否满足约束，识别失败归因，判断是否值得学习（learning-worthy）。' }
-    ];
+    const sideButtons = Array.from(document.querySelectorAll('.nav-button'));
+    const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
+    const panels = Array.from(document.querySelectorAll('.panel'));
 
-    const skillNodes = [
-      { name: 'Draft', desc: '初步技能草案', color: 'gray' },
-      { name: 'Candidate', desc: '等待验证', color: 'amber' },
-      { name: 'Validated', desc: '验证通过', color: 'blue' },
-      { name: 'Promoted', desc: '进入长期记忆', color: 'green' },
-      { name: 'Deprecated', desc: '标记废弃', color: 'red' },
-      { name: 'Archived', desc: '归档备查', color: 'gray' }
-    ];
-
-    const metrics = [
-      { name: 'success_rate', desc: '任务完成率', trend: 'up', good: '上升' },
-      { name: 'test_pass_rate', desc: '测试通过率', trend: 'up', good: '上升' },
-      { name: 'intent_drift_rate', desc: '意图跑偏率', trend: 'down', good: '下降' },
-      { name: 'over_editing_rate', desc: '过度修改率', trend: 'down', good: '下降' },
-      { name: 'constraint_preservation', desc: '约束保留率', trend: 'up', good: '上升' },
-      { name: 'bad_case_recurrence', desc: '错误复发率', trend: 'down', good: '下降' },
-      { name: 'avg_rework_count', desc: '平均返工次数', trend: 'down', good: '下降' },
-      { name: 'token_efficiency', desc: 'Token 效率', trend: 'up', good: '上升' }
-    ];
-
-    const components = [
-      { name: 'MCP Gateway', role: '入口层', desc: '提供 HTTP MCP 和 stdio MCP 双通道，支持 55 个工具，适配 Claude Code / Codex / Cursor。', color: 'purple' },
-      { name: 'LocalRuntime', role: '运行时', desc: '本地优先的执行环境，不依赖 HTTP 服务，CLI 和 stdio 模式均可独立运行。', color: 'blue' },
-      { name: 'Understanding Trace', role: '理解层', desc: '记录系统如何理解用户输入，包括语义解析、假设生成、不确定点标注。', color: 'amber' },
-      { name: 'Context Guard', role: '保护层', desc: '管理 Token 预算，在压缩上下文时保护关键约束不被丢弃。', color: 'green' },
-      { name: 'Curator', role: '策展层', desc: '将失败和反馈转化为候选技能，评估是否值得进入验证流程。', color: 'coral' },
-      { name: 'Validation Gate', role: '验证门', desc: '用 A/B 测试证明技能是否真正有效，防止虚假改进。', color: 'pink' },
-      { name: 'Dashboard', role: '观测层', desc: '六面板可视化：Run Trace、Understanding、Token、Memory、Bad Case、Skill Evolution。', color: 'cyan' },
-      { name: 'Agent Capsule', role: '持久层', desc: '存储 profile、memory、skills、bad_cases、evals 等可迁移的个人配置。', color: 'indigo' }
-    ];
-
-    // Render functions
-    function renderWorkflowSteps() {
-      const container = document.getElementById('workflow-steps');
-      container.innerHTML = workflowSteps.map((step, i) => `
-        <div class="cursor-pointer" onclick="showStepDetail(${i})">
-          <div class="step-node bg-${step.color}-50 border-2 border-${step.color}-200 rounded-xl p-4 text-center h-full transition-all hover:shadow-lg" id="step-${i}">
-            <div class="text-2xl mb-2">${i + 1}</div>
-            <div class="font-semibold text-gray-900 text-sm">${step.title}</div>
-            <div class="text-xs text-gray-500 mt-1">${step.subtitle}</div>
-          </div>
-        </div>
-      `).join('');
-      showStepDetail(0);
+    function showPanel(id) {
+      panels.forEach((panel) => panel.classList.toggle('active', panel.id === `panel-${id}`));
+      sideButtons.forEach((button) => button.classList.toggle('active', button.dataset.panel === id));
+      tabButtons.forEach((button) => button.classList.toggle('active', button.dataset.panel === id));
     }
 
-    function showStepDetail(index) {
-      const step = workflowSteps[index];
-      document.getElementById('step-detail').innerHTML = `<p><strong>${step.title}（${step.subtitle}）</strong>：${step.detail}</p>`;
-      document.querySelectorAll('.step-node').forEach((el, i) => {
-        el.classList.toggle('ring-2', i === index);
-        el.classList.toggle('ring-offset-2', i === index);
-        el.classList.toggle('ring-blue-500', i === index);
-      });
-    }
-
-    function renderSkillNodes() {
-      const container = document.getElementById('skill-lifecycle-nodes');
-      container.innerHTML = skillNodes.map((node, i) => `
-        <div class="skill-node flex flex-col items-center">
-          <div class="w-20 h-20 rounded-full bg-${node.color}-100 border-2 border-${node.color}-300 flex items-center justify-center">
-            <span class="text-xs font-medium text-${node.color}-700">${node.name}</span>
-          </div>
-          <span class="text-xs text-gray-500 mt-2">${node.desc}</span>
-          ${i < skillNodes.length - 1 ? '<div class="text-gray-300 mt-2">→</div>' : ''}
-        </div>
-      `).join('');
-    }
-
-    function renderMetrics() {
-      const container = document.getElementById('metrics-list');
-      container.innerHTML = metrics.map(m => `
-        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-          <div>
-            <div class="mono text-sm text-gray-700">${m.name}</div>
-            <div class="text-xs text-gray-500">${m.desc}</div>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-medium ${m.trend === 'up' ? 'text-green-600' : 'text-red-600'}">${m.good}</span>
-            <svg class="w-4 h-4 ${m.trend === 'up' ? 'text-green-500' : 'text-red-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${m.trend === 'up' ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3'}"/>
-            </svg>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function renderComponents() {
-      const container = document.getElementById('components-grid');
-      container.innerHTML = components.map(c => `
-        <div class="p-5 bg-gray-50 rounded-xl border border-gray-100 hover:border-${c.color}-300 transition-colors">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-3 h-3 rounded-full bg-${c.color}-500"></div>
-            <h4 class="font-semibold text-gray-900">${c.name}</h4>
-            <span class="text-xs px-2 py-0.5 bg-${c.color}-100 text-${c.color}-700 rounded-full">${c.role}</span>
-          </div>
-          <p class="text-sm text-gray-600">${c.desc}</p>
-        </div>
-      `).join('');
-    }
-
-    // Tab switching
-    function showSection(id) {
-      // Hide all sections
-      document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden'));
-      // Show target
-      document.getElementById('section-' + id).classList.remove('hidden');
-      // Update tabs
-      document.querySelectorAll('nav button').forEach(btn => {
-        btn.classList.remove('tab-active');
-        btn.classList.add('text-gray-600', 'hover:bg-gray-50');
-      });
-      const activeTab = document.getElementById('tab-' + id);
-      activeTab.classList.add('tab-active');
-      activeTab.classList.remove('text-gray-600', 'hover:bg-gray-50');
-    }
-
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-      renderWorkflowSteps();
-      renderSkillNodes();
-      renderMetrics();
-      renderComponents();
-      
-      // A/B Chart
-      const ctx = document.getElementById('abChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'radar',
-        data: {
-          labels: ['完成率', '测试通过', '约束保留', '低跑偏', '低返工', 'Token效率'],
-          datasets: [
-            {
-              label: 'Baseline（直接使用）',
-              data: [70, 65, 60, 55, 50, 45],
-              borderColor: '#94a3b8',
-              backgroundColor: 'rgba(148, 163, 184, 0.1)',
-              pointBackgroundColor: '#94a3b8'
-            },
-            {
-              label: 'StableAgent 模式',
-              data: [88, 85, 82, 80, 78, 72],
-              borderColor: '#667eea',
-              backgroundColor: 'rgba(102, 126, 234, 0.1)',
-              pointBackgroundColor: '#667eea'
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            r: {
-              beginAtZero: true,
-              max: 100,
-              ticks: { display: false },
-              grid: { color: 'rgba(0,0,0,0.05)' }
-            }
-          },
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { usePointStyle: true, padding: 20 }
-            }
-          }
-        }
-      });
-    });
+    sideButtons.forEach((button) => button.addEventListener('click', () => showPanel(button.dataset.panel)));
+    tabButtons.forEach((button) => button.addEventListener('click', () => showPanel(button.dataset.panel)));
   </script>
 </body>
 </html>

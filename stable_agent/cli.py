@@ -27,12 +27,16 @@ Usage:
     python -m stable_agent.cli effectiveness task create --task-id T01 --description "..." [--json]
     python -m stable_agent.cli effectiveness run record --task-id T01 --mode stableagent [--json]
     python -m stable_agent.cli dashboard open [--run-id ID] [--print-only]
+    python -m stable_agent.cli impact show --latest [--json]
+    python -m stable_agent.cli research scan --source arxiv --query "self evolving agents" [--json]
+    python -m stable_agent.cli research propose --finding-id FINDING_ID [--json]
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import socket
 import sys
 import webbrowser
@@ -47,6 +51,15 @@ def _base_url(args: argparse.Namespace) -> str:
     host = getattr(args, "host", DEFAULT_HOST)
     port = getattr(args, "port", DEFAULT_PORT)
     return f"http://{host}:{port}"
+
+
+def _server_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
+    """Return whether the configured local HTTP endpoint is accepting TCP."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
 
 
 def _http_get(url: str, timeout: float = 5.0) -> dict:
@@ -223,6 +236,25 @@ def cmd_task_run(args: argparse.Namespace) -> None:
         "id": "cli-task-run",
     }
 
+    host = getattr(args, "host", DEFAULT_HOST)
+    port = getattr(args, "port", DEFAULT_PORT)
+    if not _server_port_open(host, port, timeout=1.0):
+        error_data = {
+            "ok": False,
+            "run_id": "",
+            "dashboard_url": "",
+            "observer_url": "",
+            "missing_required_events": [],
+            "understanding_trace": None,
+            "token_report": None,
+            "expression_matches": None,
+            "error": f"StableAgent server 未启动或请求失败: {host}:{port} is not accepting connections",
+            "suggestion": "请先运行: PYTHONPATH=. .venv/bin/python -m stable_agent.cli serve",
+            "hint": "检查服务是否运行: PYTHONPATH=. .venv/bin/python -m stable_agent.cli health --json"
+        }
+        _output(error_data, args)
+        sys.exit(1)
+
     try:
         result = _http_post(mcp_url, rpc_body, timeout=60.0)
     except Exception as exc:
@@ -356,7 +388,8 @@ def cmd_health(args: argparse.Namespace) -> None:
         tool_list = tools.get("result", {}).get("tools", [])
         result["tool_count"] = len(tool_list)
         result["has_os_agent"] = any(t.get("name") == "stableagent.task.os_agent" for t in tool_list)
-    except Exception:
+    except Exception as exc:
+        logging.getLogger(__name__).debug("MCP tools health probe failed: %s", exc)
         pass
     result["ok"] = result["server"] and result["mcp"]
     _output(result, args)
@@ -460,6 +493,105 @@ def cmd_dashboard_open(args: argparse.Namespace) -> None:
             webbrowser.open(url)
         except Exception:
             print("无法打开浏览器，请手动访问上述 URL。")
+
+
+def cmd_impact_show(args: argparse.Namespace) -> None:
+    """Show the latest Learning Impact Report v2."""
+    from stable_agent.impact.builder import LearningImpactReportBuilder
+    from stable_agent.impact.renderer import render_user_summary_zh
+
+    report = LearningImpactReportBuilder.load_latest()
+    if report is None:
+        report = LearningImpactReportBuilder.build(
+            run_id="latest_unavailable",
+            memory_hits=[],
+            skill_hits=[],
+            profile_hits=[],
+            candidate_created=[],
+            token_report=None,
+            has_ab_validation=False,
+        )
+    data = {
+        "ok": True,
+        "learning_impact_report": report.to_dict(),
+        "summary_zh": render_user_summary_zh(report),
+    }
+    if getattr(args, "json", False):
+        _output(data, args)
+    else:
+        print(data["summary_zh"])
+
+
+def cmd_research_scan(args: argparse.Namespace) -> None:
+    """Scan arXiv/GitHub/docs and write evidence-only cards."""
+    source = args.source
+    query = args.query
+    max_results = int(getattr(args, "max_results", 3))
+
+    if source == "arxiv":
+        from stable_agent.research.arxiv_watcher import ArxivWatcher
+        cards = ArxivWatcher().scan(query, max_results=max_results)
+    elif source == "github":
+        from stable_agent.research.github_watcher import GitHubWatcher
+        cards = GitHubWatcher().scan(query, max_results=max_results)
+    elif source == "docs":
+        from stable_agent.research.docs_watcher import DocsWatcher
+        cards = DocsWatcher().scan(query, max_results=max_results)
+    else:
+        _output({"ok": False, "error": f"unsupported research source: {source}"}, args)
+        sys.exit(1)
+
+    path = _append_research_cards(cards)
+    payload = {
+        "ok": True,
+        "source": source,
+        "query": query,
+        "count": len(cards),
+        "cards": [card.to_dict() for card in cards],
+        "store_path": str(path),
+        "status": "evidence_only",
+    }
+    _output(payload, args)
+
+
+def cmd_research_propose(args: argparse.Namespace) -> None:
+    """Build an improvement proposal from an evidence card."""
+    from stable_agent.research.evidence_card import ResearchEvidenceCard
+    from stable_agent.research.proposal_builder import ProposalBuilder
+
+    finding_id = args.finding_id
+    row = _find_research_card(finding_id)
+    if row is None:
+        _output({"ok": False, "error": f"finding_id not found: {finding_id}"}, args)
+        sys.exit(1)
+    proposal = ProposalBuilder().build(ResearchEvidenceCard(**row))
+    _output({"ok": True, "proposal": proposal.to_dict()}, args)
+
+
+def _append_research_cards(cards: list[object]) -> Path:
+    path = Path(".stableagent/research/findings.jsonl")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        for card in cards:
+            payload = card.to_dict() if hasattr(card, "to_dict") else dict(card)  # type: ignore[arg-type]
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    return path
+
+
+def _find_research_card(finding_id: str) -> dict | None:
+    path = Path(".stableagent/research/findings.jsonl")
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("finding_id") == finding_id:
+            return row
+    return None
 
 
 def _add_json_flag(parser: argparse.ArgumentParser) -> None:
@@ -631,6 +763,31 @@ def main() -> None:
     dash_open_p.add_argument("--print-only", action="store_true", default=False, help="只打印 URL")
     _add_server_flags(dash_open_p)
     dash_open_p.set_defaults(func=cmd_dashboard_open)
+
+    # ---- Recursive Harness: impact ----
+    impact_parser = subparsers.add_parser("impact", help="学习影响报告")
+    impact_sub = impact_parser.add_subparsers(dest="action")
+
+    impact_show_p = impact_sub.add_parser("show", help="显示 Learning Impact Report")
+    impact_show_p.add_argument("--latest", action="store_true", default=False, help="显示最近一次报告")
+    _add_json_flag(impact_show_p)
+    impact_show_p.set_defaults(func=cmd_impact_show)
+
+    # ---- Recursive Harness: research ----
+    research_parser = subparsers.add_parser("research", help="研究证据卡")
+    research_sub = research_parser.add_subparsers(dest="action")
+
+    research_scan_p = research_sub.add_parser("scan", help="扫描外部研究源")
+    research_scan_p.add_argument("--source", required=True, choices=["arxiv", "github", "docs"], help="研究源")
+    research_scan_p.add_argument("--query", required=True, help="查询词或文档 URL")
+    research_scan_p.add_argument("--max-results", type=int, default=3, help="最大结果数")
+    _add_json_flag(research_scan_p)
+    research_scan_p.set_defaults(func=cmd_research_scan)
+
+    research_propose_p = research_sub.add_parser("propose", help="从 finding 生成提案")
+    research_propose_p.add_argument("--finding-id", required=True, help="Finding ID")
+    _add_json_flag(research_propose_p)
+    research_propose_p.set_defaults(func=cmd_research_propose)
 
     args = parser.parse_args()
     if not args.command:

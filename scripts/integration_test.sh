@@ -16,10 +16,16 @@ if [ -d ".venv" ]; then
   source .venv/bin/activate
 fi
 
+PY_BIN="$ROOT_DIR/.venv/bin/python"
+if [ ! -x "$PY_BIN" ]; then
+  echo "ERROR: .venv/bin/python not found. Do not use system python for StableAgent integration tests."
+  exit 1
+fi
+
 export PYTHONPATH="$ROOT_DIR:${PYTHONPATH:-}"
 
-python tools/integration_test.py --base-url "$BASE_URL"
-python tools/check_closed_loop.py --base-url "$BASE_URL"
+"$PY_BIN" tools/integration_test.py --base-url "$BASE_URL"
+"$PY_BIN" tools/check_closed_loop.py --base-url "$BASE_URL"
 
 echo ""
 echo "Integration test completed."

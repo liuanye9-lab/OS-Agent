@@ -24,6 +24,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import os
+import sys
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
 from stable_agent.models import SandboxResult
@@ -102,10 +103,13 @@ class Sandbox:
             True
         """
         effective_timeout: int = timeout if timeout is not None else self.timeout
+        normalized_command = list(command)
+        if normalized_command and normalized_command[0] == "python":
+            normalized_command[0] = sys.executable
 
         try:
             proc: subprocess.CompletedProcess[str] = subprocess.run(
-                command,
+                normalized_command,
                 capture_output=True,
                 text=True,
                 timeout=effective_timeout,
@@ -240,9 +244,8 @@ class Sandbox:
             tmp_file.close()
 
             # 使用当前 Python 解释器执行
-            python_exe: str = "python"
             result: SandboxResult = self.run_command(
-                command=[python_exe, tmp_file.name],
+                command=[sys.executable, tmp_file.name],
                 timeout=effective_timeout,
             )
             return result

@@ -1,0 +1,24 @@
+{
+  "preferred_language": "zh-CN",
+  "explanation_style": [
+    "小白解释",
+    "大白话",
+    "不装懂",
+    "不确定就说明"
+  ],
+  "formatting_preferences": [
+    "分阶段",
+    "进度条",
+    "验收标准",
+    "先给结论再给证据"
+  ],
+  "prompt_training_enabled": true,
+  "clarification_policy": "任务不清楚时反问三连；高风险先暂停并请求人审。",
+  "codex_prompt_preferences": {
+    "phase_plan_required": true,
+    "progress_bar_required": true,
+    "acceptance_criteria_required": true,
+    "audit_before_refactor": true,
+    "preserve_existing_contracts": true
+  }
+}

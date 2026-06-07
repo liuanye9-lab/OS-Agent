@@ -27,6 +27,7 @@ Outcomes(:attr:`ReviewGateDecision.outcome`):
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -308,11 +309,16 @@ class ReviewGate:
             # per Phase 2 lifecycle. Promoted → rejected is NOT legal,
             # which is exactly the rollback-≠-demote invariant.
             self._repo.transition_status(skill_id, version, SkillStatus.REJECTED)
-        except Exception:
+        except Exception as exc:
             # If something else is wrong (e.g. promoted state) we leave
             # the skill alone rather than silently demoting a promoted
             # version — that's the Phase 6 governance rule.
-            pass
+            logging.getLogger(__name__).warning(
+                "candidate rejection transition skipped for %s@%s: %s",
+                skill_id,
+                version,
+                exc,
+            )
 
 
 def _run_id_from_source(candidate: Any) -> str:

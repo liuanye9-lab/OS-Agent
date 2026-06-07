@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import pytest
 
-PROJECT_ROOT = Path("/Users/Zhuanz/OS-Agent/OS-Agent")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 class TestAgentRulesCliFallback:
     def _read_file(self, name: str) -> str:

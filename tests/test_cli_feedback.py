@@ -1,14 +1,16 @@
 """test_cli_feedback — V11.4 CLI feedback 命令测试。"""
 from __future__ import annotations
 import json, subprocess, sys
+from pathlib import Path
 from unittest.mock import patch
 import pytest
 CLI_MODULE = "stable_agent.cli"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 class TestFeedbackParser:
     def test_feedback_command_exists(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "feedback", "--help"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode == 0
         assert "remember" in result.stdout
@@ -17,19 +19,19 @@ class TestFeedbackParser:
 
     def test_remember_requires_run_id_and_note(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "feedback", "remember"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode != 0
 
     def test_dont_requires_run_id_and_note(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "feedback", "dont"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode != 0
 
     def test_correct_requires_run_id_phrase_meaning(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "feedback", "correct"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."})
         assert result.returncode != 0
 
@@ -37,7 +39,7 @@ class TestFeedbackExecution:
     def test_server_not_running_returns_error(self):
         result = subprocess.run([sys.executable, "-m", "stable_agent.cli", "feedback", "remember",
             "--run-id", "run_test", "--note", "test", "--json", "--port", "19999"],
-            capture_output=True, text=True, cwd="/Users/Zhuanz/OS-Agent/OS-Agent",
+            capture_output=True, text=True, cwd=PROJECT_ROOT,
             env={**__import__("os").environ, "PYTHONPATH": "."}, timeout=10)
         assert result.returncode != 0
         data = json.loads(result.stdout)

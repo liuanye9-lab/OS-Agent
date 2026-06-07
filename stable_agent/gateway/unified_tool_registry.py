@@ -87,6 +87,7 @@ class UnifiedToolRegistry:
                 "name": tool_def["name"],
                 "description": tool_def.get("description", ""),
                 "inputSchema": input_schema,
+                "input_schema": input_schema,
             }
             if "title" in tool_def:
                 entry["title"] = tool_def["title"]
@@ -1065,6 +1066,24 @@ class UnifiedToolRegistry:
 
             # === Phase 1: 接收 → 语义理解 → 意图解析 ===
             _emit("task.received", "received")
+            profile_hits: list[dict[str, Any]] = []
+            memory_hit_report_dict: dict[str, Any] = {}
+            learning_impact_report_dict: dict[str, Any] = {}
+            try:
+                from stable_agent.user_model.repository import UserModelRepository
+
+                user_repo = UserModelRepository()
+                user_repo.initialize_defaults()
+                profile_hits = user_repo.profile_hits_for_task(task_input)
+                _emit("user_profile.hit", "intent_parsing", {
+                    "profile_hits": profile_hits,
+                    "decision_summary_zh": f"命中 {len(profile_hits)} 条用户模型偏好",
+                    "why_zh": "用显式 profile 约束表达风格、思维偏好和高风险边界。",
+                    "evidence": [h.get("rule", "") for h in profile_hits],
+                    "next_step_zh": "继续生成理解轨迹。",
+                })
+            except Exception as profile_exc:
+                logger.warning("UserModelRepository 初始化失败，降级继续: %s", profile_exc)
 
             # V11.1: Understanding Trace — 语义理解轨迹（可选事件，不破坏必需链）
             understanding_trace_dict = None
@@ -1143,6 +1162,25 @@ class UnifiedToolRegistry:
                 temporal_payload["decision_summary_zh"] = "未找到相关时间记忆"
                 temporal_payload["why_zh"] = "当前项目暂无时间记忆，继续执行。"
             _emit("temporal_memory.retrieved", "temporal_memory_retrieving", temporal_payload)
+            try:
+                from stable_agent.memory_evidence.hit_report import build_memory_hit_report
+
+                memory_hit_report = build_memory_hit_report(
+                    hits=[
+                        {
+                            "memory_id": h.memory_id,
+                            "reason_zh": h.reason_zh,
+                            "source": "temporal_memory",
+                        }
+                        for h in temporal_hits[:5]
+                    ],
+                    misses=[] if temporal_hits else ["no_relevant_temporal_memory"],
+                    conflicts=[],
+                    stage="temporal_memory_retrieving",
+                )
+                memory_hit_report_dict = memory_hit_report.to_dict()
+            except Exception as memory_report_exc:
+                logger.warning("Memory hit report 生成失败，降级继续: %s", memory_report_exc)
 
             # === Phase 4: RAG 检索 ===
             _emit("rag.retrieved", "rag_retrieving",
@@ -1354,8 +1392,25 @@ class UnifiedToolRegistry:
                         _emit("memory.update.candidate", "memory_update_candidate", si_payload)
                     if si_report.skill_patches:
                         _emit("skill.patch.proposed", "skill_patch_proposal", si_payload)
-                    if si_report.validation_passed:
-                        _emit("validation.checked", "validation", si_payload)
+                    if (
+                        si_report.regression_cases
+                        or si_report.memory_candidates
+                        or si_report.skill_patches
+                    ):
+                        validation_payload = dict(si_payload)
+                        validation_payload["decision_summary_zh"] = (
+                            "验证已完成: "
+                            + ("通过" if si_report.validation_passed else "未通过")
+                        )
+                        validation_payload["why_zh"] = (
+                            "候选改进已走验证门禁；该事件表示验证已执行，不表示自动采用。"
+                        )
+                        validation_payload["next_step_zh"] = (
+                            "等待人工审核。"
+                            if si_report.validation_passed and si_report.human_review_required
+                            else "保留为候选或拒绝，不自动写入 best skill。"
+                        )
+                        _emit("validation.checked", "validation", validation_payload)
                     if si_report.human_review_required:
                         _emit("human_review.required", "human_review", si_payload)
                 else:
@@ -1369,6 +1424,48 @@ class UnifiedToolRegistry:
                 _emit("self_improvement.checked", "evaluating",
                       {"learning_triggered": False,
                        "reason_zh": f"自我优化检查失败，跳过: {exc}"})
+
+            # === Phase 8b: Learning Impact Report v2 ===
+            try:
+                from stable_agent.impact.builder import LearningImpactReportBuilder
+
+                si_dict = si_report.to_dict() if si_report else {}
+                candidate_created: list[dict[str, Any]] = []
+                for item in si_dict.get("memory_candidates", []) or []:
+                    candidate_created.append({"type": "memory", "status": "等待验证", "item": item})
+                for item in si_dict.get("skill_patches", []) or []:
+                    candidate_created.append({"type": "skill", "status": "等待验证", "item": item})
+
+                skill_hits = []
+                if si_dict.get("best_skill_exported"):
+                    skill_hits.append({"skill": "best_skill", "status": "promoted"})
+                elif si_dict.get("skill_patches"):
+                    skill_hits.append({"skill": "candidate_skill_patch", "status": "candidate"})
+
+                report = LearningImpactReportBuilder.build(
+                    run_id=ctx.run_id,
+                    memory_hits=memory_hit_report_dict.get("memory_hits", []),
+                    skill_hits=skill_hits,
+                    profile_hits=profile_hits,
+                    candidate_created=candidate_created,
+                    token_report=token_report,
+                    has_ab_validation=False,
+                )
+                learning_impact_report_dict = report.to_dict()
+                LearningImpactReportBuilder.save_latest(report)
+                _emit("learning.impact.reported", "evaluating", {
+                    "learning_impact_report": learning_impact_report_dict,
+                    "decision_summary_zh": report.user_visible_summary_zh,
+                    "why_zh": "报告只按已命中的 profile/memory/skill/A-B 证据计分，避免虚假提升声明。",
+                    "evidence": [
+                        f"profile_hits={len(profile_hits)}",
+                        f"memory_hits={len(memory_hit_report_dict.get('memory_hits', []))}",
+                        f"candidate_created={len(candidate_created)}",
+                    ],
+                    "next_step_zh": "完成 run 并等待后续验证或人工审核。",
+                })
+            except Exception as impact_exc:
+                logger.warning("LearningImpactReport 生成失败，降级继续: %s", impact_exc)
 
             # === Phase 9: 完成 ===
             _emit("task.completed", "completed")
@@ -1500,6 +1597,21 @@ class UnifiedToolRegistry:
                     # V11.1: Understanding Trace + Token Report
                     "understanding_trace": understanding_trace_dict,
                     "token_report": token_report,
+                    # Recursive Harness v2
+                    "profile_hits": profile_hits,
+                    "memory_hit_report": memory_hit_report_dict,
+                    "learning_impact_report": learning_impact_report_dict,
+                    "research_findings": [],
+                    "validation_ab": {
+                        "status": "candidate",
+                        "reason_zh": "本次 run 未执行 baseline-vs-candidate A/B，不能 promote。",
+                    },
+                    "human_review_queue": {
+                        "status": "waiting" if (si_report and getattr(si_report, "human_review_required", False)) else "none",
+                    },
+                    "self_iteration_proposal": {
+                        "status": "ready_for_human_review" if (si_report and getattr(si_report, "skill_patches", [])) else "none",
+                    },
                 },
                 plain_text=f"任务完成: {task_input[:80]}",
                 plain_text_zh=f"任务完成: {task_input[:80]}",
