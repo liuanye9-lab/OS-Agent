@@ -1,13 +1,23 @@
 /* Effectiveness Dashboard JavaScript — V11.3 Updated */
 
 const API = '/api/effectiveness';
+const pageParams = new URLSearchParams(window.location.search);
+const linkedRunId = pageParams.get('run_id') || '';
 
 // -- Initialization --
 
 document.addEventListener('DOMContentLoaded', () => {
+  setupNavigationLinks();
   loadSummaries();
   loadTasks();
 });
+
+function setupNavigationLinks() {
+  const observerLink = document.getElementById('observerLink');
+  if (observerLink && linkedRunId) {
+    observerLink.href = `/observe/${encodeURIComponent(linkedRunId)}`;
+  }
+}
 
 // -- API Helpers --
 
@@ -173,6 +183,16 @@ function showToast(message, type = 'success') {
   setTimeout(() => toast.remove(), 3000);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
 // -- Modal Handling --
 
 function openTaskModal() {
@@ -192,6 +212,10 @@ function openRunModal() {
 
 function closeRunModal() {
   document.getElementById('runModal').classList.remove('active');
+}
+
+function closeTaskDetailModal() {
+  document.getElementById('taskDetailModal').classList.remove('active');
 }
 
 // Close modal on backdrop click
@@ -273,6 +297,67 @@ async function submitRun(e) {
 }
 
 function viewTask(taskId) {
-  showToast(`查看任务详情: ${taskId}`);
-  // Future: window.location.href = `/effectiveness/task/${taskId}`;
+  openTaskDetailModal(taskId);
+}
+
+async function openTaskDetailModal(taskId) {
+  const modal = document.getElementById('taskDetailModal');
+  const title = document.getElementById('taskDetailTitle');
+  const body = document.getElementById('taskDetailBody');
+  title.textContent = `任务详情 · ${taskId}`;
+  body.innerHTML = '<div class="empty-row">加载中...</div>';
+  modal.classList.add('active');
+
+  try {
+    const detail = await apiFetch(`/task/${encodeURIComponent(taskId)}`);
+    const runs = detail.runs || [];
+    const summary = detail.summary || {};
+    body.innerHTML = `
+      <div class="detail-grid">
+        <div class="detail-card">
+          <div class="detail-label">任务 ID</div>
+          <div class="detail-value">${escapeHtml(detail.task_id)}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-label">分类</div>
+          <div class="detail-value">${escapeHtml(detail.category || 'general')}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-label">Baseline</div>
+          <div class="detail-value">${summary.baseline_count || 0}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-label">StableAgent</div>
+          <div class="detail-value">${summary.stableagent_count || 0}</div>
+        </div>
+      </div>
+      <div>
+        <div class="detail-label">描述</div>
+        <div>${escapeHtml(detail.description || '')}</div>
+      </div>
+      <div>
+        <div class="detail-label">运行记录</div>
+        <div class="runs-list">
+          ${runs.length ? runs.map(renderRunRow).join('') : '<div class="empty-row">暂无运行记录</div>'}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-row">加载失败: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderRunRow(run) {
+  const linkedRun = run.stableagent_run_id
+    ? `<a href="/observe/${encodeURIComponent(run.stableagent_run_id)}">${escapeHtml(run.stableagent_run_id)}</a>`
+    : escapeHtml(run.run_id);
+  return `
+    <div class="run-row">
+      <code>${linkedRun}</code>
+      <span>${escapeHtml(run.mode)}</span>
+      <span>${run.success ? '成功' : '失败'}</span>
+      <span>${escapeHtml(run.tokens_used ?? 0)} tokens</span>
+      <span>${escapeHtml(run.created_at ? new Date(run.created_at * 1000).toLocaleDateString() : '')}</span>
+    </div>
+  `;
 }

@@ -385,7 +385,7 @@ def cmd_health(args: argparse.Namespace) -> None:
         result["mcp"] = False
     try:
         tools = _http_get(f"{base}/mcp/tools", timeout=3.0)
-        tool_list = tools.get("result", {}).get("tools", [])
+        tool_list = tools.get("tools") or tools.get("result", {}).get("tools", [])
         result["tool_count"] = len(tool_list)
         result["has_os_agent"] = any(t.get("name") == "stableagent.task.os_agent" for t in tool_list)
     except Exception as exc:
@@ -449,8 +449,9 @@ def cmd_effectiveness_task_create(args: argparse.Namespace) -> None:
     base = _base_url(args)
     try:
         result = _http_post(f"{base}/api/effectiveness/task", {
-            "title": args.task_id, "description": args.description,
-            "task_type": getattr(args, "category", "coding"),
+            "task_id": args.task_id,
+            "description": args.description,
+            "category": getattr(args, "category", "coding"),
         }, timeout=10.0)
     except Exception as exc:
         _output({"ok": False, "error": f"请求失败: {exc}"}, args)
@@ -468,9 +469,9 @@ def cmd_effectiveness_run_record(args: argparse.Namespace) -> None:
         "test_passed": getattr(args, "test_passed", True),
         "intent_drift": getattr(args, "intent_drift", False),
         "over_editing": getattr(args, "over_editing", False),
-        "constraint_preserved": getattr(args, "constraint_preserved", True),
+        "constraint_preservation": 1.0 if getattr(args, "constraint_preserved", True) else 0.0,
         "rework_count": getattr(args, "rework_count", 0),
-        "estimated_tokens": getattr(args, "estimated_tokens", 0),
+        "tokens_used": getattr(args, "estimated_tokens", 0),
         "user_satisfaction": getattr(args, "user_satisfaction", 3),
     }
     try:

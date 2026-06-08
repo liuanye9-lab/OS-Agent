@@ -21,6 +21,7 @@
 <p align="center">
   <a href="#what-is-stableagent-os">Overview</a> ·
   <a href="#latest-version-visual-summary">Latest Version</a> ·
+  <a href="#real-model-smoke-run-evidence">Real Model Evidence</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#self-evolution-loop">Self-Evolution Loop</a> ·
@@ -113,6 +114,29 @@ stateDiagram-v2
 | Closed-loop check | PASS |
 | Visual README page QA | Desktop/mobile Playwright check passed |
 | Safety invariant | No fake learning claim, no auto-merge, PR-only self-iteration |
+
+---
+
+## Real Model Smoke Run Evidence
+
+On 2026-06-08, StableAgent OS was connected to a real OpenAI-compatible model and completed a replayable smoke run.
+
+| Item | Result |
+|---|---|
+| Model | `mimo-v2.5-pro` |
+| Client | `OpenAICompatibleClient` |
+| Mock fallback | `false` |
+| Run ID | `run_03cceb3f8e3b` |
+| Observer | `http://127.0.0.1:8000/observe/run_03cceb3f8e3b` |
+| Event replay | `22` events |
+| Event range | `mcp.call.received` -> `task.completed` |
+| Missing required events | `[]` |
+| Token ledger record | `tok_421c35812c9e` |
+| Token estimation | `106` baseline / `106` injected / `0` saved, `char_div4` estimate |
+| Effectiveness sample | `task_1780933817`, `stableagent_count=1`, model=`mimo-v2.5-pro` |
+| Effectiveness verdict | `insufficient_data`, because no baseline comparison sample exists yet |
+
+This confirms that the project is not only a static dashboard: MCP tools, OSAgent run creation, Dashboard replay, token ledger, and effectiveness recording all landed locally. It still does **not** prove self-evolution effectiveness; that requires paired baseline-vs-stableagent A/B data.
 
 ---
 
@@ -999,35 +1023,26 @@ Token 优化应通过基线 vs 实际对比展示，而不仅仅是声称。
 
 ```mermaid
 flowchart TD
-    P0[Phase 0<br/>Audit + Contract Freeze]
-    P1[Phase 1<br/>User Model Layer]
-    P2[Phase 2<br/>Evidence-Gated Memory]
-    P3[Phase 3<br/>Learning Impact Report v2]
-    P4[Phase 4<br/>Bounded Skill Editor]
-    P5[Phase 5<br/>Delayed Validation A/B]
-    P6[Phase 6<br/>Research Watcher]
-    P7[Phase 7<br/>PR-only Self Iteration]
-    P8[Phase 8<br/>Dashboard Evolution View]
-    P9[Phase 9<br/>Docs + Portfolio Expression]
+    P0[Phase 0<br/>Contract Freeze + Audit]
+    P1[Phase 1<br/>LocalRuntime + Thin Gateway]
+    P2[Phase 2<br/>SkillRepo v2 + Duplicate Detection]
+    P3[Phase 3<br/>Curator + Delayed Validation A/B]
+    P4[Phase 4<br/>ExternalCrawler + Research Index]
+    P5[Phase 5<br/>Evidence Dashboard + Impact Report]
+    P6[Phase 6<br/>PR-only Harness CI + Rollback]
 
-    P0 --> P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> P7 --> P8 --> P9
-
-    classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d;
-    class P0,P1,P2,P3,P4,P5,P6,P7,P8,P9 done;
+    P0 --> P1 --> P2 --> P3 --> P4 --> P5 --> P6
 ```
 
-| Phase | Goal | Status |
+| Phase | Goal | Success Standard |
 |---|---|---|
-| P0 | Freeze contracts, audit current state, define risk boundaries | Complete |
-| P1 | Add explicit user model, expression profile, cognitive profile, temperament policy | Complete |
-| P2 | Gate memory with evidence, conflict detection, decay, and hit reports | Complete |
-| P3 | Report measurable learning impact without fake improvement claims | Complete |
-| P4 | Bound skill edits with textual learning rate, held-out checks, and rejection buffer | Complete |
-| P5 | Require delayed related-task A/B before promotion | Complete |
-| P6 | Convert arXiv / GitHub / docs findings into evidence cards only | Complete |
-| P7 | Keep self-iteration PR-only with review gates and no auto-merge | Complete |
-| P8 | Show memory, impact, validation, research, and review status in Dashboard | Complete |
-| P9 | Update docs and portfolio framing for the Recursive Harness version | Complete |
+| P0 | Freeze contract and required events | golden snapshots pass |
+| P1 | Make gateway thinner and runtime local-first | CLI / stdio work without HTTP dependency |
+| P2 | Build real SkillRepo lifecycle | candidate / validated / promoted are separated |
+| P3 | Validate skills with related-task A/B | no simulated promotion |
+| P4 | Add external research ingestion | GitHub / arXiv findings become evidence, not direct skills |
+| P5 | Improve dashboard evidence | user sees memory, skill, token, validation, and impact |
+| P6 | Add PR-only harness CI | automation stops at ready-for-human-review |
 
 ---
 
@@ -1035,24 +1050,22 @@ flowchart TD
 
 ```mermaid
 flowchart TB
-    V10[V10<br/>事件链和 Dashboard 打通]
-    V11[V11<br/>Agent Capsule]
-    V112[V11.2<br/>Trustworthy Feedback Loop]
-    V113[V11.3<br/>Default Agent Rules + Effectiveness MVP]
-    V114[V11.4<br/>MCP + CLI Dual Gateway]
-    RH[Recursive Harness Alpha<br/>个性化 + 证据门控 + PR-only 自迭代]
-    NEXT[Next<br/>真实任务数据积累 + CI 证据面板]
-
-    V10 --> V11 --> V112 --> V113 --> V114 --> RH --> NEXT
+    V10[V10<br/>事件链和 Dashboard 打通] --> V11[V11<br/>Agent Capsule]
+    V11 --> V112[V11.2<br/>Trustworthy Feedback Loop]
+    V112 --> V113[V11.3<br/>Default Agent Rules + Effectiveness MVP]
+    V113 --> V1131[V11.3.1<br/>Effectiveness Hardening]
+    V1131 --> V114[V11.4<br/>MCP + CLI Dual Gateway]
+    V114 --> V12[V12<br/>多工具稳定接入与真实数据评测]
 ```
 
 ### 下一步重点
 
-- [ ] 积累至少 10 个真实任务的 baseline vs StableAgent A/B 数据
-- [ ] 把 `Learning Impact Report` 接入更完整的 CI / PR evidence panel
-- [ ] 让 Dashboard 支持跨 run 对比：记忆命中、返工次数、测试通过率、意图漂移
-- [ ] 将 Research Watcher 的 evidence cards 纳入人工 review queue
-- [ ] 输出一份基于真实任务数据的效果报告，而不是只展示功能完成度
+- [ ] 修正 Effectiveness schema，加入 `test_passed / rework_count / user_satisfaction` 等完整指标
+- [ ] 将 Effectiveness 数据默认写入 `.stableagent-capsule/effectiveness/`
+- [ ] 统一 `/api/effectiveness/*` 返回结构
+- [ ] Run Observer 增加"记录到 Effectiveness"
+- [ ] 积累至少 10 个真实 A/B 任务数据
+- [ ] 输出一份真实效果报告
 
 ---
 

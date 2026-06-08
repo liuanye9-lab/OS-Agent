@@ -1,6 +1,3 @@
-// run_observer.js — Dashboard Observer 前端逻辑
-// 后端事件驱动，前端不猜进度、不伪造状态
-
 const AVATAR_SCENE_MAP = {
   listening:       { scene: "desk",           labelZh: "接收任务",    prop: "task_card" },
   thinking:        { scene: "thinking_board",  labelZh: "理解需求",    prop: "magnifier" },
@@ -21,8 +18,6 @@ const AVATAR_SCENE_MAP = {
   failed:          { scene: "error_board",     labelZh: "任务失败",    prop: "error_sign" },
   idle:            { scene: "desk",            labelZh: "空闲",        prop: "coffee" }
 };
-
-// Emoji fallback (when no Canvas avatar available)
 const AVATAR_EMOJI = {
   listening:        "📥",
   thinking:         "🔎",
@@ -43,12 +38,8 @@ const AVATAR_EMOJI = {
   failed:           "⚠️",
   idle:             "☕"
 };
-
-// ========== State ==========
 let logs = [];
 let timelineItems = [];
-
-// V9.0: 阶段中文标签映射
 const STAGE_LABEL_MAP = {
   "temporal_memory_retrieving": "时间记忆",
   "context_compressing": "上下文压缩",
@@ -70,8 +61,6 @@ const STAGE_LABEL_MAP = {
   "completed": "完成",
   "failed": "失败",
 };
-
-// ========== DOM refs ==========
 const $taskName    = document.getElementById("taskName");
 const $runId       = document.getElementById("runId");
 const $progressPct = document.getElementById("progressPct");
@@ -89,54 +78,45 @@ const $logPanel    = document.getElementById("logPanel");
 const $timelineEmpty = document.getElementById("timelineEmpty");
 const $timelineCol   = document.getElementById("timelineCol");
 const $siReport    = document.getElementById("siReport");
-
-// ========== URL param ==========
 const params = new URLSearchParams(window.location.search);
-const runId   = params.get("run_id");
-
+const runMeta = document.querySelector('meta[name="run-id"]');
+const runId   = params.get("run_id") || (runMeta ? runMeta.content : "");
 if (runId) {
   $runId.textContent = runId;
   const v3Link = document.getElementById("v3Link");
   if (v3Link) v3Link.href = `/runs/${runId}`;
-  // V11.3.1: 效果评估链接带上 run_id
   const effLink = document.getElementById("effLink");
   if (effLink) effLink.href = `/effectiveness?run_id=${encodeURIComponent(runId)}`;
-  // V9.2: 先 API 回放历史事件，再 WebSocket 实时订阅
+  const navDashboardLink = document.getElementById("navDashboardLink");
+  if (navDashboardLink) navDashboardLink.href = `/observe/${encodeURIComponent(runId)}`;
+  const navTasksLink = document.getElementById("navTasksLink");
+  if (navTasksLink) navTasksLink.href = `/effectiveness?run_id=${encodeURIComponent(runId)}`;
   loadHistoryAndConnect(runId);
-  // V11.3.1: 页面加载后检查是否有当前 run_id 的效果评估数据，显示快捷入口
   checkEffectivenessForRun(runId);
 }
-
-// ========== API History Replay + WebSocket ==========
+loadUnifiedDashboardLayers();
 async function loadHistoryAndConnect(runId) {
   let historyEvents = [];
   let apiEventCount = 0;
   let dashboardReplayOk = false;
-
-  // Step 1: 请求 API 获取历史事件
   try {
     const resp = await fetch(`/api/runs/${runId}/events`);
     if (resp.ok) {
       const data = await resp.json();
-      // V10: 结构化返回 { run_id, event_count, events: [...] }
       if (data && typeof data === "object" && Array.isArray(data.events)) {
         historyEvents = data.events;
         apiEventCount = data.event_count || historyEvents.length;
       } else if (Array.isArray(data) && data.length > 0) {
-        // 兼容旧版直接返回列表
         historyEvents = data;
         apiEventCount = data.length;
       }
-
       if (historyEvents.length > 0) {
-        // 回放历史事件到 UI
         for (const evt of historyEvents) {
           applyEvent(evt);
         }
         addLogLine("info", `API 回放 ${historyEvents.length} 个历史事件 (event_count=${apiEventCount})`);
         dashboardReplayOk = true;
       }
-      // 更新 API 状态显示
       updateEventApiStatus(true, apiEventCount, dashboardReplayOk);
     } else if (resp.status === 404) {
       addLogLine("warn", `Run ${runId} 不存在 (404)`);
@@ -149,16 +129,11 @@ async function loadHistoryAndConnect(runId) {
     addLogLine("warn", `API 回放失败: ${err.message}`);
     updateEventApiStatus(false, 0, false);
   }
-
-  // Step 2: 连接 WebSocket 获取实时事件
   connectWebSocket(runId);
-
-  // Step 3: 如果 API 和 WebSocket 都无事件，显示同步错误
   setTimeout(() => {
     const ws = activeConnections.get(runId);
     const wsConnected = ws && ws.readyState === WebSocket.OPEN;
     const timelineEmpty = $timelineCol && $timelineCol.children.length === 0;
-
     if (historyEvents.length === 0 && !wsConnected) {
       showSyncError("同步异常：未收到任何事件（API 和 WebSocket 均无数据）");
     } else if (historyEvents.length === 0 && wsConnected) {
@@ -167,8 +142,6 @@ async function loadHistoryAndConnect(runId) {
     }
   }, 3000);
 }
-
-// V10: 更新 API 状态显示
 function updateEventApiStatus(apiOk, eventCount, replayOk) {
   const statusEl = document.getElementById("eventApiStatus");
   if (statusEl) {
@@ -186,8 +159,6 @@ function updateEventApiStatus(apiOk, eventCount, replayOk) {
     wsEl.className = "api-status";
   }
 }
-
-// V9.2: 显示同步错误
 function showSyncError(message) {
   const banner = document.getElementById("syncWarning");
   if (banner) {
@@ -198,8 +169,6 @@ function showSyncError(message) {
   $mcpStatus.textContent = "同步错误";
   $mcpStatus.className = "mcp-status disconnected";
 }
-
-// V9.2: 历史事件为空但 WebSocket 有实时事件的提示
 function showHistoryEmptyNotice() {
   const notice = document.createElement("div");
   notice.className = "history-empty-notice";
@@ -208,29 +177,22 @@ function showHistoryEmptyNotice() {
     $timelineCol.parentNode.insertBefore(notice, $timelineCol);
   }
 }
-
-// ========== WebSocket ==========
 function connectWebSocket(runId) {
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl    = `${protocol}//${location.host}/dashboard-sync/ws/runs/${runId}`;
-
   const ws = new WebSocket(wsUrl);
-
   ws.onopen = () => {
     $mcpStatus.textContent = "已连接";
     $mcpStatus.className   = "mcp-status";
     addLogLine("info", `WebSocket 已连接: ${runId}`);
-    // V9.2: 记录到 activeConnections 供 loadHistoryAndConnect 检查
     activeConnections.set(runId, ws);
     if (!primaryRunId) primaryRunId = runId;
-    // V10: 更新 WebSocket 状态显示
     const wsEl = document.getElementById("websocketStatus");
     if (wsEl) {
       wsEl.textContent = "✅ 已连接";
       wsEl.className = "api-status ok";
     }
   };
-
   ws.onmessage = (e) => {
     try {
       const event = JSON.parse(e.data);
@@ -239,50 +201,32 @@ function connectWebSocket(runId) {
       addLogLine("error", `消息解析失败: ${err.message}`);
     }
   };
-
   ws.onclose = () => {
     $mcpStatus.textContent = "已断开";
     $mcpStatus.className   = "mcp-status disconnected";
     addLogLine("warn", "WebSocket 已断开");
     activeConnections.delete(runId);
   };
-
   ws.onerror = () => {
     addLogLine("error", "WebSocket 连接错误");
   };
 }
-
-// ========== Apply Event ==========
 function applyEvent(evt) {
   addLogLine("info", `收到事件: ${evt.event_type || evt.type || "unknown"}`);
-
-  // V9.0: 事件同步异常检查
   if (evt.event_sync_ok === false) {
     showSyncWarning();
   }
-
-  // 1. Update progress
   if (evt.progress_pct !== undefined) {
     updateProgress(evt.progress_pct, evt.status_text_zh || evt.stage_label_zh || "");
   }
-
-  // 2. Update avatar
   if (evt.avatar_state) {
     updateAvatar(evt.avatar_state);
   }
-
-  // 3. Update status card text
   updateStatusCard(evt);
-
-  // 4. Append timeline
   appendTimeline(evt);
-
-  // 5. Update Self-Improvement Report
   if (evt.si_report || evt.self_improvement || evt.learning_triggered !== undefined) {
     updateSIReport(evt.si_report || evt.self_improvement || evt);
   }
-
-  // 6. V11.1: Update V11 panels on real-time events
   if (evt.event_type === "understanding.trace.created" && evt.understanding_trace) {
     renderUnderstandingPanel({ok: true, understanding_trace: evt.understanding_trace});
   }
@@ -304,47 +248,32 @@ function applyEvent(evt) {
       loadLearning(runId).catch(() => {});
     }
   }
-
-  // 6. Update task name
   if (evt.run_id && evt.run_id !== $runId.textContent) {
     $runId.textContent = evt.run_id;
   }
 }
-
-// ========== Update Progress ==========
 function updateProgress(pct, label) {
   const safe = Math.max(0, Math.min(100, pct));
   $progressPct.textContent = `${safe}%`;
   $progressBar.style.width = `${safe}%`;
   $progressText.textContent = label ? `${safe}% — ${label}` : `${safe}%`;
-
   $progressPct.style.color = "inherit";
 }
-
-// ========== Update Avatar ==========
 function updateAvatar(state) {
   const info = AVATAR_SCENE_MAP[state] || AVATAR_SCENE_MAP.idle;
-
-  // Canvas pixel avatar (from avatar_scene.js)
   if (typeof renderAvatarScene === "function") {
     renderAvatarScene(info.scene, "avatarCanvas");
   }
-
-  // Emoji fallback shown inside canvas as well
   $sceneLabel.textContent = info.labelZh;
   $sceneProp.textContent = `场景: ${info.scene} | 道具: ${info.prop}`;
 }
-
-// ========== Update Status Card ==========
 function updateStatusCard(evt) {
   const now = evt.stage_label_zh || evt.status_text_zh || evt.what_happened_zh || "";
   const why = evt.why_zh || evt.decision_summary_zh || "";
   const next = evt.next_step_zh || "";
   const evidence = evt.evidence || [];
-
   if (now) $nowStatus.textContent = now;
   if (why) $whyText.textContent = why;
-
   if (evidence.length > 0) {
     $evidenceText.textContent = evidence.slice(0, 3).join(" | ");
   } else if (evt.decision_summary_zh) {
@@ -352,29 +281,19 @@ function updateStatusCard(evt) {
   } else {
     $evidenceText.textContent = "--";
   }
-
   if (next) $nextStepText.textContent = next;
-
   if (evt.task_name) $taskName.textContent = evt.task_name;
 }
-
-// ========== Append Timeline ==========
 function appendTimeline(evt) {
-  // Remove empty state
   if ($timelineEmpty) {
     $timelineEmpty.remove();
-    // reclaim reference
     window._timelineEmptyRemoved = true;
   }
-
   const stage = evt.stage_label_zh || evt.stage || "";
   const what  = evt.what_happened_zh || evt.status_text_zh || evt.event_type || "";
   const pct   = evt.progress_pct !== undefined ? `${evt.progress_pct}%` : "";
-
-  // V9.0: 阶段中文标签
   const stageKey = evt.stage || "";
   const stageZhLabel = STAGE_LABEL_MAP[stageKey] || stage;
-
   const item = document.createElement("div");
   item.className = "timeline-item";
   item.innerHTML = `
@@ -382,43 +301,29 @@ function appendTimeline(evt) {
     <div class="tl-what">${escapeHtml(what)}</div>
     <div class="tl-progress">${pct}</div>
   `;
-
   $timelineCol.appendChild(item);
   timelineItems.push(item);
-
-  // Limit to 50 items
   while (timelineItems.length > 50) {
     const old = timelineItems.shift();
     if (old) old.remove();
   }
 }
-
-// ========== Update Self-Improvement Report ==========
 function updateSIReport(report) {
   if (!report) return;
-
   $siReport.classList.add("visible");
-
   document.getElementById("siTriggered").querySelector(".si-value").textContent =
     report.learning_triggered ? "是" : "否";
-
   document.getElementById("siRegressions").querySelector(".si-value").textContent =
     (report.regression_cases || []).length;
-
   document.getElementById("siMemories").querySelector(".si-value").textContent =
     (report.memory_candidates || []).length;
-
   document.getElementById("siPatches").querySelector(".si-value").textContent =
     (report.skill_patches || []).length;
-
-  // V9.0: 验证状态显式显示
   const valEl = document.getElementById("siValidation");
   valEl.querySelector(".si-value").textContent =
     report.validation_passed === true ? "✅ 通过" :
     report.validation_passed === false ? "❌ 未通过" : "--";
   valEl.className = report.validation_passed ? "si-item ok" : "si-item warn";
-
-  // V9.0: 审核状态完整展示
   const reviewEl = document.getElementById("siReview");
   const hrStatus = report.human_review_status || "--";
   const reviewLabelMap = {
@@ -433,24 +338,17 @@ function updateSIReport(report) {
   reviewEl.className = hrStatus === "approved" ? "si-item ok"
     : hrStatus === "rejected" || hrStatus === "validation_failed" ? "si-item warn"
     : "si-item";
-
-  // V9.0: 导出状态 — approved 不等于已导出
   document.getElementById("siExport").querySelector(".si-value").textContent =
     report.best_skill_exported ? "✅ 已导出" : "未导出";
-
   document.getElementById("siSummary").querySelector(".si-value").textContent =
     report.summary_zh || "--";
 }
-
-// V9.0: 显示同步异常
 function showSyncWarning() {
   const banner = document.getElementById("syncWarning");
   if (banner) {
     banner.style.display = "flex";
   }
 }
-
-// ========== Log ==========
 function addLogLine(level, msg) {
   const time = new Date().toLocaleTimeString("zh-CN");
   logs.push(`[${time}] [${level}] ${msg}`);
@@ -460,36 +358,24 @@ function addLogLine(level, msg) {
     $logPanel.scrollTop = $logPanel.scrollHeight;
   }
 }
-
 function toggleLog() {
   $logPanel.classList.toggle("open");
   if ($logPanel.classList.contains("open")) {
     $logPanel.scrollTop = $logPanel.scrollHeight;
   }
 }
-
-// ========== Utility ==========
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text || "";
   return div.innerHTML;
 }
-
-// ==================================================================
-// V8.0: Multi-Agent Collaboration — parallel run observation
-// ==================================================================
-
-// Active WebSocket connections (runId → WebSocket)
 const activeConnections = new Map();
-// Per-run event buffers (runId → events[])
 const runBuffers = new Map();
-
 /**
  * Observe multiple runs in parallel.
  * @param {string[]} runIds - list of run IDs to observe
  */
 function observeMultipleRuns(runIds) {
-  // Close existing connections
   for (const [id, ws] of activeConnections) {
     if (!runIds.includes(id)) {
       ws.close();
@@ -497,29 +383,22 @@ function observeMultipleRuns(runIds) {
       runBuffers.delete(id);
     }
   }
-
-  // Open new connections
   for (const runId of runIds) {
     if (!activeConnections.has(runId)) {
       connectMultiAgentWebSocket(runId);
     }
   }
-
-  // Update display
   updateMultiAgentDisplay();
 }
-
 function connectMultiAgentWebSocket(runId) {
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = `${protocol}//${location.host}/dashboard-sync/ws/runs/${runId}`;
   const ws = new WebSocket(wsUrl);
-
   ws.onopen = () => {
     addLogLine("info", `[Agent ${runId.slice(0, 8)}] 已连接`);
     activeConnections.set(runId, ws);
     runBuffers.set(runId, []);
   };
-
   ws.onmessage = (e) => {
     try {
       const event = JSON.parse(e.data);
@@ -527,8 +406,6 @@ function connectMultiAgentWebSocket(runId) {
       buffer.push(event);
       if (buffer.length > 100) buffer.shift();
       runBuffers.set(runId, buffer);
-
-      // If this is the "primary" run, also apply to main UI
       if (runId === primaryRunId) {
         applyEvent(event);
       }
@@ -536,29 +413,24 @@ function connectMultiAgentWebSocket(runId) {
       addLogLine("error", `[Agent ${runId.slice(0, 8)}] 消息解析失败`);
     }
   };
-
   ws.onclose = () => {
     addLogLine("warn", `[Agent ${runId.slice(0, 8)}] 断开`);
     activeConnections.delete(runId);
   };
 }
-
 let primaryRunId = null;
-
 /**
  * Update the multi-agent display panel.
  */
 function updateMultiAgentDisplay() {
   const panel = document.getElementById("multiAgentPanel");
   if (!panel) return;
-
   let html = "";
   for (const [runId, ws] of activeConnections) {
     const buffer = runBuffers.get(runId) || [];
     const lastEvent = buffer.length > 0 ? buffer[buffer.length - 1] : null;
     const status = lastEvent ? (lastEvent.status_text_zh || lastEvent.event_type) : "connecting";
     const progress = lastEvent ? (lastEvent.progress_pct || 0) : 0;
-
     html += `
       <div class="agent-card ${runId === primaryRunId ? 'primary' : ''}"
            onclick="switchPrimaryAgent('${runId}')">
@@ -575,36 +447,23 @@ function updateMultiAgentDisplay() {
         <div class="agent-event-count">${buffer.length} events</div>
       </div>`;
   }
-
   panel.innerHTML = html;
 }
-
 function switchPrimaryAgent(runId) {
   primaryRunId = runId;
   const buffer = runBuffers.get(runId) || [];
-
-  // Replay all events to main UI
   for (const event of buffer) {
     applyEvent(event);
   }
-  // Update display
   document.getElementById("runId").textContent = runId;
   updateMultiAgentDisplay();
   addLogLine("info", `切换到 Agent: ${runId.slice(0, 10)}`);
 }
-
-// Auto-refresh multi-agent display every 2 seconds
 setInterval(updateMultiAgentDisplay, 2000);
-
-// ==================================================================
-// V11.1: Six Panels + Feedback Buttons
-// ==================================================================
-
 /**
  * Load V11 panels data after history events are loaded.
  */
 async function loadV11Panels(runId) {
-  // Load in parallel
   await Promise.allSettled([
     loadUnderstanding(runId),
     loadTokenBudget(runId),
@@ -612,7 +471,6 @@ async function loadV11Panels(runId) {
     loadMemoryHealth(),
   ]);
 }
-
 async function loadUnderstanding(runId) {
   try {
     const resp = await fetch(`/api/runs/${runId}/understanding`);
@@ -624,7 +482,6 @@ async function loadUnderstanding(runId) {
     renderErrorPanel("understandingContent", e.message);
   }
 }
-
 async function loadTokenBudget(runId) {
   try {
     const resp = await fetch(`/api/runs/${runId}/token`);
@@ -636,7 +493,6 @@ async function loadTokenBudget(runId) {
     renderErrorPanel("tokenBudgetContent", e.message);
   }
 }
-
 async function loadLearning(runId) {
   try {
     const [learningResp, badcaseResp] = await Promise.all([
@@ -655,7 +511,6 @@ async function loadLearning(runId) {
     renderErrorPanel("badCaseContent", e.message);
   }
 }
-
 async function loadMemoryHealth() {
   try {
     const resp = await fetch("/api/memory/health");
@@ -668,9 +523,6 @@ async function loadMemoryHealth() {
     renderErrorPanel("memoryHealthContent", e.message);
   }
 }
-
-// ========== Render Functions ==========
-
 function renderUnderstandingPanel(data) {
   const el = document.getElementById("understandingContent");
   if (!data.ok || !data.understanding_trace) {
@@ -691,7 +543,6 @@ function renderUnderstandingPanel(data) {
     ${(t.expression_matches || []).length > 0 ? `<div class="v11-item"><span class="label">表达习惯匹配</span><span class="value">${t.expression_matches.map(m => `<span class="v11-tag green">${esc(m.phrase || m.normalized_meaning || JSON.stringify(m))}</span>`).join("")}</span></div>` : ""}
   `;
 }
-
 function renderTokenBudgetPanel(data) {
   const el = document.getElementById("tokenBudgetContent");
   if (!data.ok || !data.token_report) {
@@ -716,7 +567,6 @@ function renderTokenBudgetPanel(data) {
     ${t.summary_zh ? `<div style="margin-top:8px;font-size:11px;color:var(--text-secondary)">${esc(t.summary_zh)}</div>` : ""}
   `;
 }
-
 function renderBadCasePanel(data) {
   const el = document.getElementById("badCaseContent");
   if (!data.ok || !data.badcases || data.badcases.length === 0) {
@@ -729,7 +579,6 @@ function renderBadCasePanel(data) {
   }
   el.innerHTML = html;
 }
-
 function renderSkillEvolutionPanel(data) {
   const el = document.getElementById("skillEvolutionContent");
   const reviewEl = document.getElementById("skillReviewStatus");
@@ -751,7 +600,6 @@ function renderSkillEvolutionPanel(data) {
     <div class="v11-item"><span class="label">验证状态</span><span class="value">${s.validation_passed === true ? '<span class="v11-tag green">通过</span>' : s.validation_passed === false ? '<span class="v11-tag red">未通过</span>' : '--'}</span></div>
     <div class="v11-item"><span class="label">审核状态</span><span class="value">${hrLabel[s.human_review_status] || s.human_review_status || "--"}</span></div>
   `;
-  // V11.2: Show review status detail
   if (reviewEl) {
     if (s.human_review_status === "pending") {
       reviewEl.innerHTML = '<span class="v11-tag orange">待人工审核</span> — 请前往审核队列确认';
@@ -762,7 +610,6 @@ function renderSkillEvolutionPanel(data) {
     }
   }
 }
-
 function renderMemoryMapPanel(data) {
   const el = document.getElementById("memoryMapContent");
   if (!data.ok || data.total_memories === 0) {
@@ -778,7 +625,6 @@ function renderMemoryMapPanel(data) {
     <div class="v11-item"><span class="label">高价值</span><span class="value">${(data.high_value_items || []).length} 条</span></div>
   `;
 }
-
 function renderMemoryHealthPanel(data) {
   const el = document.getElementById("memoryHealthContent");
   if (!data.ok) {
@@ -795,25 +641,17 @@ function renderMemoryHealthPanel(data) {
     ${data.summary_zh ? `<div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">${esc(data.summary_zh)}</div>` : ""}
   `;
 }
-
 function renderErrorPanel(panelId, error) {
   const el = document.getElementById(panelId);
   if (el) el.innerHTML = `<div class="empty-state" style="color:#bf360c">加载失败: ${esc(error)}</div>`;
 }
-
 function esc(text) {
   const d = document.createElement("div");
   d.textContent = text || "";
   return d.innerHTML;
 }
-
-// ==================================================================
-// Recursive Harness panels
-// ==================================================================
-
 function updateRecursiveHarnessPanels(evt) {
   if (!evt || typeof evt !== "object") return;
-
   const publicDecision = pickPublicDecisionFields(evt);
   if (evt.profile_hits) renderListPanel("rhProfileContent", evt.profile_hits, ["profile", "rule", "why_zh"]);
   if (evt.memory_hit_report) renderMemoryHitPanel(evt.memory_hit_report);
@@ -826,7 +664,6 @@ function updateRecursiveHarnessPanels(evt) {
   if (evt.validation_ab) renderKeyValuePanel("rhValidationContent", evt.validation_ab);
   if (evt.human_review_queue) renderKeyValuePanel("rhReviewContent", evt.human_review_queue);
   if (evt.self_iteration_proposal) renderKeyValuePanel("rhSelfIterationContent", evt.self_iteration_proposal);
-
   if (publicDecision.decision_summary_zh || publicDecision.why_zh || publicDecision.next_step_zh) {
     const target = document.getElementById("rhImpactContent");
     if (target && !evt.learning_impact_report) {
@@ -834,7 +671,6 @@ function updateRecursiveHarnessPanels(evt) {
     }
   }
 }
-
 function pickPublicDecisionFields(evt) {
   return {
     decision_summary_zh: evt.decision_summary_zh || "",
@@ -843,7 +679,6 @@ function pickPublicDecisionFields(evt) {
     next_step_zh: evt.next_step_zh || "",
   };
 }
-
 function renderPublicDecision(data) {
   return `
     ${data.decision_summary_zh ? `<div class="v11-item"><span class="label">decision_summary_zh</span><span class="value">${esc(data.decision_summary_zh)}</span></div>` : ""}
@@ -852,7 +687,6 @@ function renderPublicDecision(data) {
     ${data.next_step_zh ? `<div class="v11-item"><span class="label">next_step_zh</span><span class="value">${esc(data.next_step_zh)}</span></div>` : ""}
   `;
 }
-
 function renderListPanel(panelId, items, keys) {
   const el = document.getElementById(panelId);
   if (!el) return;
@@ -868,7 +702,6 @@ function renderListPanel(panelId, items, keys) {
     return `<div style="margin-bottom:8px">${rows}</div>`;
   }).join("");
 }
-
 function renderKeyValuePanel(panelId, data) {
   const el = document.getElementById(panelId);
   if (!el) return;
@@ -882,12 +715,10 @@ function renderKeyValuePanel(panelId, data) {
     .map((key) => `<div class="v11-item"><span class="label">${esc(key)}</span><span class="value">${esc(formatPublicValue(data[key]))}</span></div>`)
     .join("") || '<div class="empty-state">暂无数据</div>';
 }
-
 function renderMemoryHitPanel(report) {
   const hits = report.memory_hits || [];
   renderListPanel("rhMemoryContent", hits, ["memory_id", "reason_zh", "source"]);
 }
-
 function renderSkillHitPanel(report) {
   const skillHits = report.skill_hits || [];
   if (skillHits.length) {
@@ -901,7 +732,6 @@ function renderSkillHitPanel(report) {
   }
   renderListPanel("rhSkillContent", [], ["skill", "status"]);
 }
-
 function renderImpactPanel(report) {
   const el = document.getElementById("rhImpactContent");
   if (!el) return;
@@ -918,25 +748,16 @@ function renderImpactPanel(report) {
     <div class="v11-item"><span class="label">summary</span><span class="value">${esc(report.user_visible_summary_zh || "")}</span></div>
   `;
 }
-
 function formatScore(value) {
   const num = Number(value || 0);
   return `${Math.round(num * 100)}%`;
 }
-
 function formatPublicValue(value) {
   if (Array.isArray(value)) return value.map((x) => String(x)).join(" | ");
   if (value && typeof value === "object") return value.decision_summary_zh || value.why_zh || value.status || JSON.stringify(value);
   return String(value || "");
 }
-
-// ========== Real-time V11 event handling ==========
-// Patch applyEvent to handle V11 events
 const _originalApplyEvent = applyEvent;
-// We can't reassign applyEvent since it's already used, so we extend it via a wrapper
-// Instead, we'll add V11 handling in the existing applyEvent by extending the WebSocket handler
-
-// ========== Feedback Buttons ==========
 async function feedbackRemember() {
   if (!runId) return;
   const el = document.getElementById("feedbackResult");
@@ -955,7 +776,6 @@ async function feedbackRemember() {
     el.style.color = "#bf360c";
   }
 }
-
 async function feedbackDontDoThis() {
   if (!runId) return;
   const el = document.getElementById("feedbackResult");
@@ -974,7 +794,6 @@ async function feedbackDontDoThis() {
     el.style.color = "#bf360c";
   }
 }
-
 async function feedbackCorrectAndRemember() {
   if (!runId) return;
   const correction = prompt("请输入纠正内容:");
@@ -995,11 +814,6 @@ async function feedbackCorrectAndRemember() {
     el.style.color = "#bf360c";
   }
 }
-
-// ==================================================================
-// V11.2: Intervention Buttons + Auto-refresh
-// ==================================================================
-
 /**
  * "理解正确" — POST /api/feedback/remember
  */
@@ -1022,7 +836,6 @@ async function feedbackUnderstandingCorrect() {
     el.style.color = "#bf360c";
   }
 }
-
 /**
  * "有偏差，纠正" — POST /api/feedback/correct-and-remember
  */
@@ -1053,7 +866,6 @@ async function feedbackUnderstandingFix() {
     el.style.color = "#bf360c";
   }
 }
-
 /**
  * Memory action buttons — placeholder for future MCP integration
  */
@@ -1064,7 +876,6 @@ function memoryAction(action) {
   el.style.color = "#0071e3";
   addLogLine("info", `Memory action: ${action}`);
 }
-
 /**
  * "生成回归测试" — show eval_case_id if available
  */
@@ -1087,7 +898,6 @@ async function generateRegressionTest() {
     el.textContent = "查询失败";
   }
 }
-
 /**
  * Auto-refresh V11 panels after feedback
  */
@@ -1100,16 +910,9 @@ async function refreshV11Panels() {
     loadMemoryHealth(),
   ]);
 }
-
-// Load V11 panels after history is loaded
 if (runId) {
   setTimeout(() => loadV11Panels(runId), 1500);
 }
-
-// ==================================================================
-// V11.3.1: Effectiveness Run Check — show badge if A/B data exists
-// ==================================================================
-
 /**
  * Check if the current run_id has associated effectiveness A/B data.
  * If so, show a small badge/card in the observer page linking to the comparison.
@@ -1120,25 +923,24 @@ async function checkEffectivenessForRun(runId) {
     if (!resp.ok) return;
     const data = await resp.json();
     if (!data.ok || !data.data) return;
-
     const summary = data.data;
-    // Only show if there's actual comparison data
     if ((summary.baseline_count || 0) < 1 && (summary.stableagent_count || 0) < 1) return;
-
+    const navTaskBadge = document.getElementById("navTaskBadge");
+    if (navTaskBadge) {
+      navTaskBadge.textContent = String((summary.baseline_count || 0) + (summary.stableagent_count || 0));
+    }
     const verdictLabel = {
       "effective": "✅ 已验证有效",
       "promising": "🔶 有潜力",
       "not_effective": "⚠️ 未见效",
       "insufficient_data": "⏳ 数据不足",
     }[summary.verdict] || "⏳ 评估中";
-
     const verdictColor = {
       "effective": "#2e7d32",
       "promising": "#e65100",
       "not_effective": "#bf360c",
       "insufficient_data": "#86868b",
     }[summary.verdict] || "#86868b";
-
     const effBadge = document.createElement("div");
     effBadge.id = "effectivenessBadge";
     effBadge.style.cssText = `
@@ -1162,13 +964,131 @@ async function checkEffectivenessForRun(runId) {
       </div>
       <a href="/effectiveness?run_id=${encodeURIComponent(runId)}" style="font-size:12px;color:var(--accent);text-decoration:none;white-space:nowrap">查看详情 →</a>
     `;
-
-    // Insert after the status card
     const statusCard = document.getElementById("statusCard");
     if (statusCard && statusCard.parentNode) {
       statusCard.parentNode.appendChild(effBadge);
     }
   } catch (e) {
-    // Silently ignore — effectiveness data may not exist yet
   }
+}
+
+function exportRunSnapshot() {
+  if (!runId) {
+    addLogLine("warn", "当前页面没有 run_id，无法导出运行快照");
+    return;
+  }
+  const snapshot = {
+    run_id: runId,
+    task_name: $taskName ? $taskName.textContent : "",
+    progress: $progressPct ? $progressPct.textContent : "",
+    status: $nowStatus ? $nowStatus.textContent : "",
+    logs,
+    timeline: timelineItems,
+    exported_at: new Date().toISOString(),
+  };
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${runId}-snapshot.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  addLogLine("info", `已导出 ${runId} 快照`);
+}
+
+async function loadUnifiedDashboardLayers() {
+  await Promise.allSettled([
+    loadEffectivenessLayer(),
+    loadReviewLayer(),
+  ]);
+}
+
+async function loadEffectivenessLayer() {
+  const rowsEl = document.getElementById("effectivenessRows");
+  if (!rowsEl) return;
+  try {
+    const resp = await fetch("/api/effectiveness/summary");
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) {
+      throw new Error(data.error || "Effectiveness summary unavailable");
+    }
+    const summaries = (data.data && data.data.summaries) || [];
+    const totalRuns = summaries.reduce((sum, item) => (
+      sum + (item.baseline_count || 0) + (item.stableagent_count || 0)
+    ), 0);
+    const effectiveCount = summaries.filter(item => item.verdict === "effective").length;
+    const pendingCount = summaries.filter(item => item.verdict === "insufficient_data").length;
+    setText("effTotalTasks", summaries.length);
+    setText("effTotalRuns", totalRuns);
+    setText("effEffectiveTasks", effectiveCount);
+    setText("effPendingTasks", pendingCount);
+    const navTaskBadge = document.getElementById("navTaskBadge");
+    if (navTaskBadge) navTaskBadge.textContent = String(summaries.length);
+    if (!summaries.length) {
+      rowsEl.innerHTML = '<tr><td colspan="6" class="unified-empty">暂无效果评估数据。运行记录出现后会自动汇总到这里。</td></tr>';
+      return;
+    }
+    rowsEl.innerHTML = summaries.map(renderEffectivenessRow).join("");
+  } catch (err) {
+    rowsEl.innerHTML = `<tr><td colspan="6" class="unified-empty">Effectiveness 加载失败: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderEffectivenessRow(item) {
+  const verdictMap = {
+    effective: "有效",
+    promising: "有潜力",
+    not_effective: "未见效",
+    insufficient_data: "数据不足",
+  };
+  return `
+    <tr>
+      <td><code>${escapeHtml(item.task_id)}</code></td>
+      <td>${item.baseline_count || 0}</td>
+      <td>${item.stableagent_count || 0}</td>
+      <td>${formatSignedDelta(item.delta_success, 2)}</td>
+      <td>${formatSignedDelta(item.delta_tokens, 0)}</td>
+      <td><span class="verdict-pill">${escapeHtml(verdictMap[item.verdict] || item.verdict || "--")}</span></td>
+    </tr>
+  `;
+}
+
+function formatSignedDelta(value, digits) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return "--";
+  const num = Number(value);
+  if (Math.abs(num) < 0.001) return "0";
+  const sign = num > 0 ? "+" : "";
+  return `${sign}${num.toFixed(digits)}`;
+}
+
+async function loadReviewLayer() {
+  const target = document.getElementById("reviewQueueSummary");
+  if (!target) return;
+  try {
+    const resp = await fetch("/api/reviews");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const reviews = Array.isArray(data) ? data : (data.reviews || data.items || []);
+    target.textContent = reviews.length
+      ? `${reviews.length} 个审核项等待处理。`
+      : "当前没有待处理审核项。";
+  } catch (err) {
+    target.textContent = "Review API 暂不可用，人工审核状态仍可在下方 Harness 面板查看。";
+  }
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(value);
+}
+
+function copyMcpConfig() {
+  const text = document.getElementById("mcpConfigBlock")?.textContent || "";
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(
+    () => addLogLine("info", "已复制 MCP 配置"),
+    () => addLogLine("warn", "复制失败，请手动选择 MCP 配置")
+  );
 }
