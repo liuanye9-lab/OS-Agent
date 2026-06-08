@@ -79,16 +79,22 @@ const $timelineEmpty = document.getElementById("timelineEmpty");
 const $timelineCol   = document.getElementById("timelineCol");
 const $siReport    = document.getElementById("siReport");
 const params = new URLSearchParams(window.location.search);
-const runId   = params.get("run_id");
+const runMeta = document.querySelector('meta[name="run-id"]');
+const runId   = params.get("run_id") || (runMeta ? runMeta.content : "");
 if (runId) {
   $runId.textContent = runId;
   const v3Link = document.getElementById("v3Link");
   if (v3Link) v3Link.href = `/runs/${runId}`;
   const effLink = document.getElementById("effLink");
   if (effLink) effLink.href = `/effectiveness?run_id=${encodeURIComponent(runId)}`;
+  const navDashboardLink = document.getElementById("navDashboardLink");
+  if (navDashboardLink) navDashboardLink.href = `/observe/${encodeURIComponent(runId)}`;
+  const navTasksLink = document.getElementById("navTasksLink");
+  if (navTasksLink) navTasksLink.href = `/effectiveness?run_id=${encodeURIComponent(runId)}`;
   loadHistoryAndConnect(runId);
   checkEffectivenessForRun(runId);
 }
+loadUnifiedDashboardLayers();
 async function loadHistoryAndConnect(runId) {
   let historyEvents = [];
   let apiEventCount = 0;
@@ -919,6 +925,10 @@ async function checkEffectivenessForRun(runId) {
     if (!data.ok || !data.data) return;
     const summary = data.data;
     if ((summary.baseline_count || 0) < 1 && (summary.stableagent_count || 0) < 1) return;
+    const navTaskBadge = document.getElementById("navTaskBadge");
+    if (navTaskBadge) {
+      navTaskBadge.textContent = String((summary.baseline_count || 0) + (summary.stableagent_count || 0));
+    }
     const verdictLabel = {
       "effective": "✅ 已验证有效",
       "promising": "🔶 有潜力",
@@ -960,4 +970,125 @@ async function checkEffectivenessForRun(runId) {
     }
   } catch (e) {
   }
+}
+
+function exportRunSnapshot() {
+  if (!runId) {
+    addLogLine("warn", "当前页面没有 run_id，无法导出运行快照");
+    return;
+  }
+  const snapshot = {
+    run_id: runId,
+    task_name: $taskName ? $taskName.textContent : "",
+    progress: $progressPct ? $progressPct.textContent : "",
+    status: $nowStatus ? $nowStatus.textContent : "",
+    logs,
+    timeline: timelineItems,
+    exported_at: new Date().toISOString(),
+  };
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${runId}-snapshot.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  addLogLine("info", `已导出 ${runId} 快照`);
+}
+
+async function loadUnifiedDashboardLayers() {
+  await Promise.allSettled([
+    loadEffectivenessLayer(),
+    loadReviewLayer(),
+  ]);
+}
+
+async function loadEffectivenessLayer() {
+  const rowsEl = document.getElementById("effectivenessRows");
+  if (!rowsEl) return;
+  try {
+    const resp = await fetch("/api/effectiveness/summary");
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) {
+      throw new Error(data.error || "Effectiveness summary unavailable");
+    }
+    const summaries = (data.data && data.data.summaries) || [];
+    const totalRuns = summaries.reduce((sum, item) => (
+      sum + (item.baseline_count || 0) + (item.stableagent_count || 0)
+    ), 0);
+    const effectiveCount = summaries.filter(item => item.verdict === "effective").length;
+    const pendingCount = summaries.filter(item => item.verdict === "insufficient_data").length;
+    setText("effTotalTasks", summaries.length);
+    setText("effTotalRuns", totalRuns);
+    setText("effEffectiveTasks", effectiveCount);
+    setText("effPendingTasks", pendingCount);
+    const navTaskBadge = document.getElementById("navTaskBadge");
+    if (navTaskBadge) navTaskBadge.textContent = String(summaries.length);
+    if (!summaries.length) {
+      rowsEl.innerHTML = '<tr><td colspan="6" class="unified-empty">暂无效果评估数据。运行记录出现后会自动汇总到这里。</td></tr>';
+      return;
+    }
+    rowsEl.innerHTML = summaries.map(renderEffectivenessRow).join("");
+  } catch (err) {
+    rowsEl.innerHTML = `<tr><td colspan="6" class="unified-empty">Effectiveness 加载失败: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderEffectivenessRow(item) {
+  const verdictMap = {
+    effective: "有效",
+    promising: "有潜力",
+    not_effective: "未见效",
+    insufficient_data: "数据不足",
+  };
+  return `
+    <tr>
+      <td><code>${escapeHtml(item.task_id)}</code></td>
+      <td>${item.baseline_count || 0}</td>
+      <td>${item.stableagent_count || 0}</td>
+      <td>${formatSignedDelta(item.delta_success, 2)}</td>
+      <td>${formatSignedDelta(item.delta_tokens, 0)}</td>
+      <td><span class="verdict-pill">${escapeHtml(verdictMap[item.verdict] || item.verdict || "--")}</span></td>
+    </tr>
+  `;
+}
+
+function formatSignedDelta(value, digits) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return "--";
+  const num = Number(value);
+  if (Math.abs(num) < 0.001) return "0";
+  const sign = num > 0 ? "+" : "";
+  return `${sign}${num.toFixed(digits)}`;
+}
+
+async function loadReviewLayer() {
+  const target = document.getElementById("reviewQueueSummary");
+  if (!target) return;
+  try {
+    const resp = await fetch("/api/reviews");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const reviews = Array.isArray(data) ? data : (data.reviews || data.items || []);
+    target.textContent = reviews.length
+      ? `${reviews.length} 个审核项等待处理。`
+      : "当前没有待处理审核项。";
+  } catch (err) {
+    target.textContent = "Review API 暂不可用，人工审核状态仍可在下方 Harness 面板查看。";
+  }
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(value);
+}
+
+function copyMcpConfig() {
+  const text = document.getElementById("mcpConfigBlock")?.textContent || "";
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(
+    () => addLogLine("info", "已复制 MCP 配置"),
+    () => addLogLine("warn", "复制失败，请手动选择 MCP 配置")
+  );
 }

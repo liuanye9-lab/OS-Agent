@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Run Observer — StableAgent OS</title>
-<link rel="stylesheet" href="/static/run_observer.css" data-style-markers="v11-grid v11-panel v11-tag v11-bar">
+<link rel="stylesheet" href="/static/run_observer.css?v=20260608-readme-visual" data-style-markers="v11-grid v11-panel v11-tag v11-bar">
 </head>
 <body>
 
@@ -14,27 +14,27 @@
       <div class="brand-mark">S</div>
       <div>
         <div class="brand-title">StableAgent</div>
-        <div class="brand-subtitle">Recursive Harness</div>
+        <div class="brand-subtitle">Recursive Suite</div>
       </div>
     </div>
 
     <nav>
       <div class="nav-section-title">Menu</div>
       <div class="nav-list">
-        <div class="nav-item active"><span class="nav-icon">▦</span> Dashboard</div>
-        <div class="nav-item"><span class="nav-icon">☑</span> Tasks <span class="nav-badge">124</span></div>
-        <div class="nav-item"><span class="nav-icon">◷</span> Timeline</div>
-        <div class="nav-item"><span class="nav-icon">↗</span> Analytics</div>
-        <div class="nav-item"><span class="nav-icon">◎</span> Review</div>
+        <a class="nav-item active" href="/observer" id="navDashboardLink"><span class="nav-icon">▦</span> Overview</a>
+        <a class="nav-item" href="/effectiveness" id="navTasksLink"><span class="nav-icon">☑</span> Effectiveness <span class="nav-badge" id="navTaskBadge">--</span></a>
+        <a class="nav-item" href="/dashboard/timeline"><span class="nav-icon">◷</span> Timeline</a>
+        <a class="nav-item" href="/dashboard/analytics"><span class="nav-icon">↗</span> Analytics</a>
+        <a class="nav-item" href="/dashboard/review"><span class="nav-icon">◎</span> Review</a>
       </div>
     </nav>
 
     <nav class="sidebar-footer">
       <div class="nav-section-title">General</div>
       <div class="nav-list">
-        <div class="nav-item"><span class="nav-icon">⚙</span> Settings</div>
-        <div class="nav-item"><span class="nav-icon">?</span> Help</div>
-        <div class="nav-item"><span class="nav-icon">⇥</span> Export</div>
+        <a class="nav-item" href="/connect"><span class="nav-icon">⚙</span> Connect</a>
+        <a class="nav-item" href="/help"><span class="nav-icon">?</span> Help</a>
+        <button class="nav-item nav-button" type="button" onclick="exportRunSnapshot()"><span class="nav-icon">⇥</span> Export</button>
       </div>
       <div class="mcp-status" id="mcpStatus">已连接</div>
     </nav>
@@ -64,7 +64,7 @@
       <span class="sync-warning-text">事件同步异常：部分事件未成功写入后端存储。Dashboard 数据可能不完整。</span>
     </div>
 
-    <section class="hero-row">
+    <section class="hero-row" id="overviewSection">
       <div>
         <h1 class="task-name" id="taskName">Dashboard</h1>
         <div class="run-id" id="runId">--</div>
@@ -107,7 +107,7 @@
           </article>
         </div>
 
-        <section class="dashboard-panel analytics-card">
+        <section class="dashboard-panel analytics-card" id="analyticsSection">
           <div class="panel-header">
             <h2 class="panel-title">Project Analytics</h2>
             <div class="panel-legend"><span class="legend-dot"></span> Weekly Activity</div>
@@ -169,6 +169,97 @@
         </section>
       </aside>
     </div>
+    <section class="unified-section" id="effectivenessSection">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Effectiveness</h2>
+          <p class="panel-subtitle">A/B runs, task outcomes, and whether OSAgent is actually helping.</p>
+        </div>
+        <div class="panel-legend"><span class="legend-dot"></span> Same-page layer</div>
+      </div>
+      <div class="unified-grid four-up">
+        <article class="unified-stat">
+          <div class="stat-label">Tasks</div>
+          <div class="stat-value" id="effTotalTasks">--</div>
+        </article>
+        <article class="unified-stat">
+          <div class="stat-label">Runs</div>
+          <div class="stat-value" id="effTotalRuns">--</div>
+        </article>
+        <article class="unified-stat">
+          <div class="stat-label">Effective</div>
+          <div class="stat-value good" id="effEffectiveTasks">--</div>
+        </article>
+        <article class="unified-stat">
+          <div class="stat-label">Needs Data</div>
+          <div class="stat-value muted" id="effPendingTasks">--</div>
+        </article>
+      </div>
+      <div class="unified-table-wrap">
+        <table class="unified-table">
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Baseline</th>
+              <th>StableAgent</th>
+              <th>Success Δ</th>
+              <th>Token Δ</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="effectivenessRows">
+            <tr><td colspan="6" class="unified-empty">Loading effectiveness data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="unified-section" id="reviewSection">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Review Queue</h2>
+          <p class="panel-subtitle">Human review, skill promotion, and self-iteration gates stay in this main control room.</p>
+        </div>
+      </div>
+      <div class="unified-grid three-up">
+        <article class="unified-card">
+          <div class="card-kicker">Manual Review</div>
+          <h3>Pending decisions</h3>
+          <p id="reviewQueueSummary">Review data appears here when the orchestrator has pending items.</p>
+        </article>
+        <article class="unified-card">
+          <div class="card-kicker">Skills</div>
+          <h3>Promotion gate</h3>
+          <p>Candidate skills remain visible below in the Recursive Harness panels before any promotion.</p>
+        </article>
+        <article class="unified-card">
+          <div class="card-kicker">Safety</div>
+          <h3>No hidden page jumps</h3>
+          <p>Primary navigation now opens dedicated pages instead of scrolling to same-page anchors.</p>
+        </article>
+      </div>
+    </section>
+    <section class="unified-section" id="connectSection">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Connect & Settings</h2>
+          <p class="panel-subtitle">Local MCP endpoint, Dashboard health, and copy-ready commands in the same visual system.</p>
+        </div>
+      </div>
+      <div class="unified-grid two-up">
+        <article class="unified-card">
+          <div class="card-kicker">MCP endpoint</div>
+          <h3>StableAgent HTTP MCP</h3>
+          <pre class="code-block" id="mcpConfigBlock">{"mcpServers":{"stableagent":{"type":"http","url":"http://127.0.0.1:8000/mcp"}}}</pre>
+          <button class="inline-action" type="button" onclick="copyMcpConfig()">Copy MCP config</button>
+        </article>
+        <article class="unified-card">
+          <div class="card-kicker">Default run command</div>
+          <h3>OSAgent task entry</h3>
+          <pre class="code-block">PYTHONPATH=. ./.venv/bin/python -m stable_agent.cli task run --task-input "你的任务" --open-dashboard --json</pre>
+          <button class="inline-action" type="button" onclick="location.href='/observer'">Back to Overview</button>
+        </article>
+      </div>
+    </section>
 <div class="bottom-bar">
   <div class="si-report" id="siReport">
     <h3>📊 Self-Improvement Report</h3>
@@ -323,7 +414,7 @@
 
 
 
-<script src="/static/avatar_scene.js"></script>
-<script src="/static/run_observer.js"></script>
+<script src="/static/avatar_scene.js?v=20260608-readme-visual"></script>
+<script src="/static/run_observer.js?v=20260608-readme-visual"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@
 
 ## 核心规则
 
+本项目默认启用 StableAgent OS。只要用户在本项目 Codex 对话中提出任务，默认先确保 Dashboard 服务运行，然后调用 `stableagent.task.os_agent` 创建 run；除非用户明确说“不要启动 OSAgent / 不要开 Dashboard / 只回答不要执行”。
+
 在执行**任何非平凡的编码任务**之前，**必须先调用** `stableagent.task.os_agent`。
 
 ### 什么是"非平凡"？
@@ -24,6 +26,18 @@
 
 ## StableAgent Calling Priority
 
+0. **先确保 Dashboard 服务运行**：
+
+```bash
+bash .agents/skills/os-agent/scripts/launch_dashboard.sh
+```
+
+该脚本必须在服务未运行时自动启动：
+
+```bash
+PYTHONPATH=. ./.venv/bin/python -m stable_agent.cli serve
+```
+
 1. **优先使用 HTTP MCP**：Prefer MCP; call `stableagent.task.os_agent`
 
 2. **如果 HTTP MCP 不可用，使用 stdio MCP**：call `stableagent-stdio.task.os_agent`
@@ -31,7 +45,7 @@
 3. **如果 MCP 都不可用，使用 CLI fallback**：
 
 ```bash
-PYTHONPATH=. /Users/Zhuanz/OS-Agent/OS-Agent/.venv/bin/python -m stable_agent.cli task run \
+PYTHONPATH=. ./.venv/bin/python -m stable_agent.cli task run \
   --task-input "<user task>" \
   --open-dashboard \
   --json
@@ -52,6 +66,8 @@ PYTHONPATH=. /Users/Zhuanz/OS-Agent/OS-Agent/.venv/bin/python -m stable_agent.cl
 - `expression_matches`
 
 Do not start editing files before either MCP or CLI creates a StableAgent run.
+
+如果服务未运行，先启动服务；不要仅提示用户手动运行。
 
 ## 调用方式
 

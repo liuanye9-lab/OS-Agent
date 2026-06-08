@@ -63,6 +63,12 @@ class TestEffectivenessExecution:
         with redirect_stdout(f): cmd_effectiveness_task_create(args)
         data = json.loads(f.getvalue())
         assert data["ok"] is True
+        _, payload = mock_post.call_args.args[:2]
+        assert payload["task_id"] == "T01"
+        assert payload["description"] == "test"
+        assert payload["category"] == "coding"
+        assert "title" not in payload
+        assert "task_type" not in payload
 
     @patch(f"{CLI_MODULE}._http_post")
     def test_run_record_json_output(self, mock_post):
@@ -79,3 +85,8 @@ class TestEffectivenessExecution:
         with redirect_stdout(f): cmd_effectiveness_run_record(args)
         data = json.loads(f.getvalue())
         assert data["ok"] is True
+        _, payload = mock_post.call_args.args[:2]
+        assert payload["tokens_used"] == 12000
+        assert payload["constraint_preservation"] == 1.0
+        assert "estimated_tokens" not in payload
+        assert "constraint_preserved" not in payload
